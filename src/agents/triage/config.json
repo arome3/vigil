@@ -1,0 +1,24 @@
+{
+  "name": "vigil-triage",
+  "description": "First responder — enriches and scores security alerts, filters false positives",
+  "model": "claude-sonnet-4-5-20250929",
+  "system_prompt_file": "system-prompt.md",
+  "tools": [
+    "vigil-esql-alert-enrichment",
+    "vigil-esql-historical-fp-rate",
+    "vigil-search-asset-criticality"
+  ],
+  "a2a_connections": [],
+  "config": {
+    "investigate_threshold": 0.7,
+    "suppress_threshold": 0.4,
+    "llm_temperature": 0.1
+  },
+  "api_key_role_descriptors": {
+    "vigil_triage": {
+      "indices": [
+        { "names": ["vigil-alerts-*", "vigil-assets"], "privileges": ["read", "write"] }
+      ]
+    }
+  }
+}

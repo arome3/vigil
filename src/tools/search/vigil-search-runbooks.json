@@ -1,0 +1,21 @@
+{
+  "name": "vigil-search-runbooks",
+  "type": "search",
+  "description": "Find relevant remediation runbooks using hybrid search",
+  "tags": ["vigil", "commander"],
+  "agent": "vigil-commander",
+  "index": "vigil-runbooks",
+  "retrieval_strategy": "hybrid",
+  "text_field": "content",
+  "vector_field": "content_vector",
+  "result_fields": [
+    "runbook_id",
+    "title",
+    "description",
+    "steps",
+    "applicable_services",
+    "historical_success_rate",
+    "times_used"
+  ],
+  "max_results": 3
+}

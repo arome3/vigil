@@ -1,0 +1,23 @@
+{
+  "name": "vigil-search-baselines",
+  "type": "search",
+  "description": "Retrieve 7-day rolling health baselines for a service",
+  "tags": ["vigil", "verifier"],
+  "agent": "vigil-verifier",
+  "index": "vigil-baselines",
+  "retrieval_strategy": "keyword",
+  "query_fields": ["service_name"],
+  "filter": {
+    "range": { "computed_at": { "gte": "now-24h" } }
+  },
+  "result_fields": [
+    "service_name",
+    "metric_name",
+    "avg_value",
+    "stddev_value",
+    "p50_value",
+    "p95_value",
+    "p99_value"
+  ],
+  "max_results": 20
+}

@@ -1,0 +1,17 @@
+{
+  "id": "vigil-esql-dependency-tracer",
+  "type": "esql",
+  "description": "Trace upstream and downstream service dependencies using APM trace data. Identifies whether the anomalous service is the root cause or a downstream victim of another failing service.",
+  "tags": ["vigil", "monitoring"],
+  "agent": "vigil-sentinel",
+  "configuration": {
+    "query": "FROM traces-apm-* | WHERE @timestamp > NOW() - 30m AND service.name == ?service_name | STATS call_count = COUNT(*), avg_duration = AVG(span.duration.us), error_count = SUM(CASE(event.outcome == \"failure\", 1, 0)) BY service.name, span.destination.service.resource | EVAL error_rate = error_count / call_count * 100 | SORT error_rate DESC | LIMIT 20",
+    "params": {
+      "service_name": {
+        "type": "keyword",
+        "required": true,
+        "description": "Name of the service to trace dependencies for"
+      }
+    }
+  }
+}

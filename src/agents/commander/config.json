@@ -1,0 +1,25 @@
+{
+  "name": "vigil-commander",
+  "description": "Tactical planner — formulates remediation plans from runbooks and context",
+  "model": "claude-sonnet-4-5-20250929",
+  "system_prompt_file": "system-prompt.md",
+  "tools": [
+    "vigil-search-runbooks",
+    "vigil-esql-impact-assessment"
+  ],
+  "a2a_connections": [],
+  "config": {
+    "planning_deadline_ms": 40000,
+    "llm_temperature": 0.1
+  },
+  "api_key_role_descriptors": {
+    "vigil_commander": {
+      "indices": [
+        {
+          "names": ["vigil-runbooks", "vigil-assets", "vigil-incidents"],
+          "privileges": ["read"]
+        }
+      ]
+    }
+  }
+}

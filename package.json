@@ -1,0 +1,25 @@
+{
+  "name": "vigil",
+  "version": "0.1.0",
+  "description": "Autonomous SOC platform built on Elasticsearch Agent Builder",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "bootstrap": "bash scripts/bootstrap.sh",
+    "dev": "node src/webhooks/github-receiver.js",
+    "test": "node --test tests/**/*.js",
+    "demo:scenario1": "node scripts/demo/scenario-compromised-key.js",
+    "demo:scenario2": "node scripts/demo/scenario-bad-deploy.js"
+  },
+  "dependencies": {
+    "@elastic/elasticsearch": "^8.17.0",
+    "@slack/web-api": "^7.0.0",
+    "axios": "^1.7.0",
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0",
+    "uuid": "^10.0.0",
+    "winston": "^3.14.0"
+  }
+}

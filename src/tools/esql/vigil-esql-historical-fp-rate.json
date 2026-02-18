@@ -1,0 +1,17 @@
+{
+  "id": "vigil-esql-historical-fp-rate",
+  "type": "esql",
+  "description": "Calculate the false positive rate for a specific alert rule over the past 90 days from the incident knowledge base. Returns total incidents, false positive count, and FP rate for priority score weighting.",
+  "tags": ["vigil", "triage"],
+  "agent": "vigil-triage",
+  "configuration": {
+    "query": "FROM vigil-incidents | WHERE created_at > NOW() - 90d AND alert_ids IS NOT NULL | EVAL is_fp = CASE(resolution_type == \"false_positive\", 1, 0) | STATS total_incidents = COUNT(*), false_positives = SUM(is_fp), fp_rate = SUM(is_fp) / COUNT(*) BY source_type | WHERE source_type == ?rule_id | KEEP source_type, total_incidents, false_positives, fp_rate",
+    "params": {
+      "rule_id": {
+        "type": "keyword",
+        "required": true,
+        "description": "The SIEM rule ID that triggered the alert"
+      }
+    }
+  }
+}

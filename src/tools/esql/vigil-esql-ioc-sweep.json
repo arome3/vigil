@@ -1,0 +1,32 @@
+{
+  "id": "vigil-esql-ioc-sweep",
+  "type": "esql",
+  "description": "Environment-wide Indicator of Compromise (IoC) sweep across all security data indices over the past 7 days. Identifies hosts and IPs that have communicated with known malicious infrastructure.",
+  "tags": ["vigil", "threat-hunting"],
+  "agent": "vigil-threat-hunter",
+  "configuration": {
+    "query": "FROM logs-endpoint-*, logs-network-*, logs-dns-* | WHERE @timestamp > NOW() - 7d AND (destination.ip IN (?malicious_ips) OR dns.question.name IN (?malicious_domains) OR file.hash.sha256 IN (?malicious_hashes) OR process.name IN (?malicious_processes)) | STATS hit_count = COUNT(*), unique_indicators = COUNT_DISTINCT(COALESCE(destination.ip, dns.question.name, file.hash.sha256, process.name)), first_contact = MIN(@timestamp), last_contact = MAX(@timestamp) BY host.name, source.ip | SORT hit_count DESC | LIMIT 50",
+    "params": {
+      "malicious_ips": {
+        "type": "keyword",
+        "required": true,
+        "description": "Known malicious IP addresses"
+      },
+      "malicious_domains": {
+        "type": "keyword",
+        "required": true,
+        "description": "Known malicious domains (C2, phishing)"
+      },
+      "malicious_hashes": {
+        "type": "keyword",
+        "required": true,
+        "description": "Known malicious file hashes (SHA-256)"
+      },
+      "malicious_processes": {
+        "type": "keyword",
+        "required": true,
+        "description": "Known malicious process names"
+      }
+    }
+  }
+}

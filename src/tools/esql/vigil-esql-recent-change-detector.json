@@ -1,0 +1,17 @@
+{
+  "id": "vigil-esql-recent-change-detector",
+  "type": "esql",
+  "description": "Query GitHub events index for any deployments, pushes, or configuration changes affecting a service within the preceding 30 minutes. Provides early signal for change-induced incidents.",
+  "tags": ["vigil", "monitoring"],
+  "agent": "vigil-sentinel",
+  "configuration": {
+    "query": "FROM github-events-* | WHERE @timestamp > NOW() - 30m AND service_name == ?service_name AND event_type IN (\"deployment\", \"push\", \"config_change\") | SORT @timestamp DESC | KEEP @timestamp, event_type, commit.sha, commit.message, commit.author, pr.number, deployment.environment | LIMIT 5",
+    "params": {
+      "service_name": {
+        "type": "keyword",
+        "required": true,
+        "description": "Name of the service to check for recent changes"
+      }
+    }
+  }
+}

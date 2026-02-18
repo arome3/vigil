@@ -1,0 +1,30 @@
+{
+  "name": "vigil-threat-hunter",
+  "description": "Proactive sweep — finds additional IoCs across the environment after investigation",
+  "model": "claude-sonnet-4-5-20250929",
+  "system_prompt_file": "system-prompt.md",
+  "tools": [
+    "vigil-esql-ioc-sweep",
+    "vigil-esql-behavioral-anomaly"
+  ],
+  "a2a_connections": [],
+  "config": {
+    "sweep_deadline_ms": 45000,
+    "anomaly_threshold": 8.0,
+    "llm_temperature": 0.1
+  },
+  "api_key_role_descriptors": {
+    "vigil_threat_hunter": {
+      "indices": [
+        {
+          "names": ["logs-endpoint-*", "logs-network-*", "logs-dns-*", "logs-auth-*"],
+          "privileges": ["read"]
+        },
+        {
+          "names": ["vigil-threat-intel"],
+          "privileges": ["read"]
+        }
+      ]
+    }
+  }
+}

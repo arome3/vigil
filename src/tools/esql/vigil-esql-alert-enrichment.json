@@ -1,0 +1,22 @@
+{
+  "id": "vigil-esql-alert-enrichment",
+  "type": "esql",
+  "description": "Correlate alert source IP and username against auth, endpoint, and network logs within a 24-hour window. Returns event counts, unique destinations, failed auth attempts, privilege escalations, and a composite risk signal.",
+  "tags": ["vigil", "triage"],
+  "agent": "vigil-triage",
+  "configuration": {
+    "query": "FROM logs-auth-*, logs-endpoint-*, logs-network-* | WHERE @timestamp > NOW() - 24h AND (source.ip == ?source_ip OR user.name == ?username) | STATS event_count = COUNT(*), unique_destinations = COUNT_DISTINCT(destination.ip), failed_auths = SUM(CASE(event.outcome == \"failure\", 1, 0)), priv_escalations = SUM(CASE(event.action == \"privilege_escalation\", 1, 0)) BY source.ip, user.name | EVAL risk_signal = (failed_auths * 2) + (priv_escalations * 5) + (unique_destinations * 0.5) | SORT risk_signal DESC | LIMIT 10",
+    "params": {
+      "source_ip": {
+        "type": "keyword",
+        "required": true,
+        "description": "Source IP address from the alert"
+      },
+      "username": {
+        "type": "keyword",
+        "required": true,
+        "description": "Username from the alert"
+      }
+    }
+  }
+}

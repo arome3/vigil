@@ -1,0 +1,19 @@
+{
+  "id": "vigil-esql-change-correlation",
+  "type": "esql",
+  "description": "Correlate error spikes with recent code deployments by joining service error logs with GitHub deployment events. Answers: 'What code was deployed in the minutes before this service broke?' Uses LOOKUP JOIN (tech preview).",
+  "tags": ["vigil", "investigation"],
+  "agent": "vigil-investigator",
+  "lookupJoinTechPreview": true,
+  "configuration": {
+    "query": "FROM logs-service-* | WHERE @timestamp > NOW() - 1h AND log.level == \"ERROR\" | STATS error_count = COUNT(), first_error = MIN(@timestamp) BY service.name | LOOKUP JOIN github-events-* ON service.name | WHERE event_type == \"deployment\" AND @timestamp > NOW() - 1h AND @timestamp < first_error | EVAL time_gap_seconds = DATE_DIFF(\"seconds\", @timestamp, first_error) | WHERE time_gap_seconds > 0 AND time_gap_seconds < ?max_gap_seconds | SORT time_gap_seconds ASC | KEEP service.name, error_count, commit.sha, commit.message, commit.author, pr.number, time_gap_seconds, deployment.previous_sha | LIMIT 5",
+    "params": {
+      "max_gap_seconds": {
+        "type": "integer",
+        "required": false,
+        "default": 600,
+        "description": "Maximum time gap (seconds) between deployment and first error to consider as correlated"
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "vigil-search-asset-criticality",
+  "type": "search",
+  "description": "Look up asset criticality, owner, classification, and compliance tags",
+  "tags": ["vigil", "triage"],
+  "agent": "vigil-triage",
+  "index": "vigil-assets",
+  "retrieval_strategy": "keyword",
+  "query_fields": ["asset_id", "name"],
+  "result_fields": [
+    "asset_id",
+    "name",
+    "type",
+    "criticality",
+    "environment",
+    "owner_team",
+    "owner_email",
+    "data_classification",
+    "compliance_tags",
+    "service_dependencies"
+  ],
+  "max_results": 1
+}

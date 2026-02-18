@@ -1,0 +1,26 @@
+{
+  "name": "vigil-sentinel",
+  "description": "Continuous monitoring — detects operational anomalies in metrics, traces, and logs",
+  "model": "claude-sonnet-4-5-20250929",
+  "system_prompt_file": "system-prompt.md",
+  "tools": [
+    "vigil-esql-health-monitor",
+    "vigil-esql-dependency-tracer",
+    "vigil-esql-recent-change-detector"
+  ],
+  "a2a_connections": ["vigil-coordinator"],
+  "config": {
+    "anomaly_stddev_threshold": 2.0,
+    "high_confidence_window_minutes": 5,
+    "change_window_minutes": 30,
+    "llm_temperature": 0.1
+  },
+  "api_key_role_descriptors": {
+    "vigil_sentinel": {
+      "indices": [
+        { "names": ["vigil-baselines", "vigil-alerts-operational", "github-events-*"], "privileges": ["read", "write"] },
+        { "names": ["vigil-assets"], "privileges": ["read"] }
+      ]
+    }
+  }
+}

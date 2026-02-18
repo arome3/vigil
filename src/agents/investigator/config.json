@@ -1,0 +1,39 @@
+{
+  "name": "vigil-investigator",
+  "description": "Deep-dive analyst — traces attack chains, maps MITRE ATT&CK, correlates code changes",
+  "model": "claude-sonnet-4-5-20250929",
+  "system_prompt_file": "system-prompt.md",
+  "tools": [
+    "vigil-esql-attack-chain-tracer",
+    "vigil-esql-blast-radius",
+    "vigil-esql-change-correlation",
+    "vigil-search-mitre-attack",
+    "vigil-search-threat-intel",
+    "vigil-search-incident-similarity"
+  ],
+  "a2a_connections": [],
+  "config": {
+    "investigation_deadline_ms": 55000,
+    "sparse_result_threshold": 3,
+    "change_gap_high_seconds": 300,
+    "change_gap_medium_seconds": 600,
+    "change_gap_max_seconds": 3600,
+    "llm_temperature": 0.1
+  },
+  "api_key_role_descriptors": {
+    "vigil_investigator": {
+      "indices": [
+        {
+          "names": [
+            "vigil-alerts-*",
+            "vigil-investigations",
+            "vigil-threat-intel",
+            "vigil-incidents",
+            "github-events-*"
+          ],
+          "privileges": ["read", "write", "create_index"]
+        }
+      ]
+    }
+  }
+}

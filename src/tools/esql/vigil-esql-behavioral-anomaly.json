@@ -1,0 +1,23 @@
+{
+  "id": "vigil-esql-behavioral-anomaly",
+  "type": "esql",
+  "description": "Detect anomalous user behavior patterns by computing an anomaly score based on geographic diversity, off-hours activity, failed authentication ratio, and IP diversity. Excludes the known compromised user to find similar accounts.",
+  "tags": ["vigil", "threat-hunting"],
+  "agent": "vigil-threat-hunter",
+  "configuration": {
+    "query": "FROM logs-auth-* | WHERE @timestamp > NOW() - 7d | STATS login_count = COUNT(*), unique_ips = COUNT_DISTINCT(source.ip), unique_geos = COUNT_DISTINCT(source.geo.country_iso_code), off_hours_logins = SUM(CASE(DATE_EXTRACT(\"hour_of_day\", @timestamp) < 6 OR DATE_EXTRACT(\"hour_of_day\", @timestamp) > 22, 1, 0)), failed_ratio = SUM(CASE(event.outcome == \"failure\", 1, 0)) / COUNT(*) BY user.name | EVAL anomaly_score = (unique_geos * 3) + (off_hours_logins * 2) + (failed_ratio * 10) + (unique_ips * 0.5) | WHERE anomaly_score > ?anomaly_threshold AND user.name != ?known_compromised_user | SORT anomaly_score DESC | LIMIT 20",
+    "params": {
+      "anomaly_threshold": {
+        "type": "double",
+        "required": false,
+        "default": 8.0,
+        "description": "Minimum anomaly score to include in results"
+      },
+      "known_compromised_user": {
+        "type": "keyword",
+        "required": true,
+        "description": "Username already known to be compromised (excluded from results)"
+      }
+    }
+  }
+}

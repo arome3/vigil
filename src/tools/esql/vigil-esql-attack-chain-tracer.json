@@ -1,0 +1,37 @@
+{
+  "id": "vigil-esql-attack-chain-tracer",
+  "type": "esql",
+  "description": "Trace attack path through process trees and network connections starting from an initial indicator. Uses a configurable time window that the Investigator progressively widens (1h, 6h, 24h) if initial results are sparse.",
+  "tags": ["vigil", "investigation"],
+  "agent": "vigil-investigator",
+  "configuration": {
+    "query": "FROM logs-endpoint-*, logs-network-* | WHERE @timestamp > ?window_start AND @timestamp < ?window_end AND (process.parent.entity_id == ?initial_indicator OR source.ip == ?indicator_ip OR file.hash.sha256 == ?indicator_hash) | STATS event_count = COUNT(*), unique_hosts = COUNT_DISTINCT(host.name), unique_processes = COUNT_DISTINCT(process.name), earliest = MIN(@timestamp), latest = MAX(@timestamp) BY host.name, process.name, event.action | SORT earliest ASC | LIMIT 50",
+    "params": {
+      "window_start": {
+        "type": "date",
+        "required": true,
+        "description": "Start of the investigation time window"
+      },
+      "window_end": {
+        "type": "date",
+        "required": true,
+        "description": "End of the investigation time window"
+      },
+      "initial_indicator": {
+        "type": "keyword",
+        "required": true,
+        "description": "Process entity ID, parent process entity ID, or other initial indicator"
+      },
+      "indicator_ip": {
+        "type": "keyword",
+        "required": false,
+        "description": "Optional IP address to include in the trace"
+      },
+      "indicator_hash": {
+        "type": "keyword",
+        "required": false,
+        "description": "Optional file hash (SHA-256) to include in the trace"
+      }
+    }
+  }
+}

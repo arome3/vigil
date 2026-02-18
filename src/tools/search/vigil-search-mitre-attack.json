@@ -1,0 +1,19 @@
+{
+  "name": "vigil-search-mitre-attack",
+  "type": "search",
+  "description": "Map observed TTPs to MITRE ATT&CK techniques using semantic search",
+  "tags": ["vigil", "investigator"],
+  "agent": "vigil-investigator",
+  "index": "vigil-threat-intel",
+  "retrieval_strategy": "hybrid",
+  "text_field": "description",
+  "vector_field": "description_vector",
+  "filter": { "term": { "type": "mitre_technique" } },
+  "result_fields": [
+    "mitre_technique_id",
+    "mitre_technique_name",
+    "mitre_tactic",
+    "description"
+  ],
+  "max_results": 5
+}

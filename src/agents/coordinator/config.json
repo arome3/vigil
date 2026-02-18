@@ -1,0 +1,44 @@
+{
+  "name": "vigil-coordinator",
+  "description": "Central orchestrator — manages full incident lifecycle from alert to verified resolution",
+  "model": "claude-sonnet-4-5-20250929",
+  "system_prompt_file": "system-prompt.md",
+  "tools": [
+    "vigil-tool-incident-state",
+    "vigil-tool-incident-metrics"
+  ],
+  "a2a_connections": [
+    "vigil-triage",
+    "vigil-investigator",
+    "vigil-threat-hunter",
+    "vigil-sentinel",
+    "vigil-commander",
+    "vigil-executor",
+    "vigil-verifier"
+  ],
+  "config": {
+    "max_reflection_loops": 3,
+    "approval_timeout_minutes": 15,
+    "suppress_threshold": 0.4,
+    "investigate_threshold": 0.4,
+    "llm_temperature": 0.2
+  },
+  "api_key_role_descriptors": {
+    "vigil_coordinator": {
+      "indices": [
+        {
+          "names": [
+            "vigil-incidents",
+            "vigil-alerts-*",
+            "vigil-actions-*"
+          ],
+          "privileges": [
+            "read",
+            "write",
+            "create_index"
+          ]
+        }
+      ]
+    }
+  }
+}

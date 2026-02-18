@@ -1,0 +1,21 @@
+{
+  "name": "vigil-search-threat-intel",
+  "type": "search",
+  "description": "Check IoCs against threat intelligence feeds",
+  "tags": ["vigil", "investigator"],
+  "agent": "vigil-investigator",
+  "index": "vigil-threat-intel",
+  "retrieval_strategy": "keyword",
+  "query_fields": ["value"],
+  "filter": { "terms": { "type": ["ip", "domain", "hash", "url"] } },
+  "result_fields": [
+    "ioc_id",
+    "type",
+    "value",
+    "threat_actor",
+    "confidence",
+    "source",
+    "mitre_technique_id"
+  ],
+  "max_results": 10
+}
