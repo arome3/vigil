@@ -1,0 +1,27 @@
+{
+  "name": "vigil-verifier",
+  "description": "Quality assurance -- verifies remediation worked by comparing metrics to baselines",
+  "model": "claude-sonnet-4-5-20250929",
+  "system_prompt_file": "system-prompt.md",
+  "tools": [
+    "vigil-esql-health-comparison",
+    "vigil-search-baselines"
+  ],
+  "a2a_connections": [],
+  "config": {
+    "stabilization_wait_seconds": 60,
+    "health_score_threshold": 0.8,
+    "verification_deadline_ms": 50000,
+    "llm_temperature": 0.1
+  },
+  "api_key_role_descriptors": {
+    "vigil_verifier": {
+      "indices": [
+        {
+          "names": ["vigil-baselines", "vigil-incidents", "vigil-actions-*"],
+          "privileges": ["read", "write"]
+        }
+      ]
+    }
+  }
+}
