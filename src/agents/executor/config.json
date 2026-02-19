@@ -1,0 +1,39 @@
+{
+  "name": "vigil-executor",
+  "description": "Action taker — executes remediation plans through Elastic Workflows",
+  "model": "claude-sonnet-4-5-20250929",
+  "system_prompt_file": "system-prompt.md",
+  "tools": [
+    "vigil-wf-containment",
+    "vigil-wf-remediation",
+    "vigil-wf-notify",
+    "vigil-wf-ticketing",
+    "vigil-wf-approval",
+    "vigil-wf-reporting",
+    "vigil-tool-audit-log"
+  ],
+  "config": {
+    "approval_timeout_minutes": 15,
+    "approval_poll_interval_ms": 15000,
+    "workflow_timeout_ms": 120000,
+    "llm_temperature": 0.1
+  },
+  "api_key_role_descriptors": {
+    "vigil_executor": {
+      "indices": [
+        {
+          "names": [
+            "vigil-actions-*",
+            "vigil-incidents",
+            "vigil-approval-responses"
+          ],
+          "privileges": [
+            "read",
+            "write",
+            "create_index"
+          ]
+        }
+      ]
+    }
+  }
+}
