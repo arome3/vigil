@@ -18,8 +18,12 @@ export const A2A_TIMEOUTS = Object.freeze({
   'vigil-commander':      45_000,
   'vigil-executor':      300_000,
   'vigil-verifier':      120_000,
-  'vigil-wf-notify':      30_000,
-  'vigil-wf-approval':    30_000
+  'vigil-wf-containment':  30_000,
+  'vigil-wf-remediation': 120_000,
+  'vigil-wf-notify':       30_000,
+  'vigil-wf-ticketing':    30_000,
+  'vigil-wf-approval':     30_000,
+  'vigil-wf-reporting':    60_000
 });
 
 const DEFAULT_TIMEOUT = 60_000;

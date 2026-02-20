@@ -1,0 +1,116 @@
+name: vigil-wf-approval
+description: Interactive Slack approval gate with buttons
+triggers:
+  - type: api
+    enabled: true
+
+params:
+  incident_id:    { type: string, required: true }
+  action_summary: { type: string, required: true }
+  severity:       { type: string, required: true }
+  action_id:      { type: string, required: false }
+  timeout_min:    { type: integer, default: 15 }
+
+steps:
+  - id: send_approval_request
+    type: webhook
+    config:
+      url: "https://slack.com/api/chat.postMessage"
+      method: POST
+      headers:
+        Authorization: "Bearer {{secrets.slack_bot_token}}"
+        Content-Type: "application/json"
+      body:
+        channel: "{{secrets.slack_approval_channel}}"
+        blocks:
+          - type: header
+            text:
+              type: plain_text
+              text: "Vigil Approval Required"
+          - type: section
+            text:
+              type: mrkdwn
+              text: "*Incident:* {{params.incident_id}}\n*Severity:* {{params.severity}}\n*Timeout:* {{params.timeout_min}} minutes"
+          - type: divider
+          - type: section
+            text:
+              type: mrkdwn
+              text: "*Proposed Action:*\n{{params.action_summary}}"
+          - type: section
+            text:
+              type: mrkdwn
+              text: "This action requires human approval before execution. Please review and respond."
+          - type: actions
+            block_id: "vigil_approval_{{params.incident_id}}"
+            elements:
+              - type: button
+                text:
+                  type: plain_text
+                  text: "Approve"
+                style: primary
+                action_id: "vigil_approve_{{params.incident_id}}"
+                value: "approved|{{params.action_id}}"
+              - type: button
+                text:
+                  type: plain_text
+                  text: "Reject"
+                style: danger
+                action_id: "vigil_reject_{{params.incident_id}}"
+                value: "rejected|{{params.action_id}}"
+              - type: button
+                text:
+                  type: plain_text
+                  text: "More Info"
+                action_id: "vigil_info_{{params.incident_id}}"
+                value: "info|{{params.action_id}}"
+          - type: context
+            elements:
+              - type: mrkdwn
+                text: "Auto-escalation in {{params.timeout_min}} minutes if no response"
+
+  # Primary: wait-based step with webhook callback (requires Elastic Workflows 9.3+ wait support)
+  - id: wait_for_response
+    type: wait
+    config:
+      timeout: "{{params.timeout_min}}m"
+      resume_on:
+        - webhook_path: "/api/vigil/approval-callback"
+          match:
+            incident_id: "{{params.incident_id}}"
+
+  - id: process_response
+    type: condition
+    config:
+      if: "{{step.wait_for_response.result.value == 'approve'}}"
+      then: return_approved
+      else: return_rejected
+
+  - id: return_approved
+    type: return
+    config:
+      approved: true
+      approved_by: "{{step.wait_for_response.result.user}}"
+
+  - id: return_rejected
+    type: return
+    config:
+      approved: false
+      reason: "{{step.wait_for_response.result.reason || 'Timeout or rejection'}}"
+
+  # --------------------------------------------------------------------------
+  # Polling alternative (use if the wait step is unavailable in your version):
+  #
+  # - id: poll_for_response
+  #   type: esql
+  #   config:
+  #     query: |
+  #       FROM vigil-approval-responses
+  #       | WHERE incident_id == "{{params.incident_id}}"
+  #         AND @timestamp > NOW() - {{params.timeout_min}}m
+  #       | SORT @timestamp DESC
+  #       | LIMIT 1
+  #     retry:
+  #       max_attempts: "{{params.timeout_min * 4}}"
+  #       interval: 15s
+  #       until: "{{result.total > 0}}"
+  # --------------------------------------------------------------------------

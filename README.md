@@ -4,7 +4,7 @@
 
 ### Autonomous Security Operations Center
 
-**9 AI Agents &middot; 16 ES|QL Tools &middot; 7 Search Tools &middot; 6 Elastic Workflows &middot; Sub-3-Minute Resolution**
+**9 AI Agents &middot; 21 ES|QL Tools &middot; 8 Search Tools &middot; 7 Elastic Workflows &middot; Sub-3-Minute Resolution**
 
 Built with **Elasticsearch Agent Builder**
 
@@ -79,8 +79,8 @@ Vigil follows a **4-layer architecture** where each layer builds on the one belo
 │                         Threat Hunter sweeps environment    │
 │                         Sentinel monitors operations        │
 ├─────────────────────────────────────────────────────────────┤
-│  DATA LAYER             10 Elasticsearch indices            │
-│                         16 ES|QL tools + 7 Search tools     │
+│  DATA LAYER             11 Elasticsearch indices            │
+│                         21 ES|QL tools + 8 Search tools     │
 │                         Dense vector embeddings (1024-dim)  │
 │                         GitHub webhook ingest pipeline      │
 └─────────────────────────────────────────────────────────────┘
@@ -121,6 +121,8 @@ The **Coordinator** acts as the hub in a hub-and-spoke pattern, managing inciden
 
 **Continuous Learning** — Analyst agent performs post-incident analysis: calibrates triage weight accuracy against actual outcomes, generates new runbooks from successful resolutions, tunes per-service anomaly thresholds, discovers recurring incident patterns, and produces retrospective reports.
 
+**Compliance-Ready Reporting** — Reporter agent generates scheduled and on-demand reports: daily/weekly executive summaries with MTTR trends, monthly compliance evidence mapped to SOC 2, ISO 27001, and GDPR Article 33 controls, per-service operational trend reports, and agent performance analytics — all with full data provenance and delivered via Slack, email, or Jira.
+
 ---
 
 ## The Agent System
@@ -143,10 +145,10 @@ Vigil deploys **9 agents** in a hub-and-spoke topology. The Coordinator delegate
 
 ## Tool Ecosystem
 
-Vigil provides **29 purpose-built tools** across three categories: 16 ES|QL analytical tools, 7 search retrieval tools, and 6 Elastic Workflows.
+Vigil provides **35 purpose-built tools** across three categories: 21 ES|QL analytical tools, 8 search retrieval tools, and 7 Elastic Workflows.
 
 <details>
-<summary><strong>16 ES|QL Tools</strong> — Parameterized analytical queries</summary>
+<summary><strong>21 ES|QL Tools</strong> — Parameterized analytical queries</summary>
 
 | Tool | Agent | Index | Purpose |
 |------|-------|-------|---------|
@@ -166,11 +168,16 @@ Vigil provides **29 purpose-built tools** across three categories: 16 ES|QL anal
 | `vigil-esql-triage-calibration` | Analyst | vigil-incidents | Priority score vs outcome accuracy |
 | `vigil-esql-threshold-analysis` | Analyst | vigil-incidents, metrics-\* | Per-service anomaly threshold tuning |
 | `vigil-esql-remediation-effectiveness` | Analyst | vigil-actions-\* | Action success/failure rates |
+| `vigil-report-executive-summary` | Reporter | vigil-incidents | Executive metrics aggregation |
+| `vigil-report-compliance-evidence` | Reporter | vigil-incidents, vigil-actions-\* | Audit trail and control mapping |
+| `vigil-report-operational-trends` | Reporter | vigil-incidents, vigil-investigations | Per-service reliability trends |
+| `vigil-report-agent-performance` | Reporter | vigil-agent-telemetry, vigil-learnings | Agent execution metrics |
+| `vigil-report-incident-detail-export` | Reporter | vigil-incidents, vigil-actions-\*, vigil-learnings | Single-incident full export |
 
 </details>
 
 <details>
-<summary><strong>7 Search Tools</strong> — Keyword, hybrid, and kNN vector retrieval</summary>
+<summary><strong>8 Search Tools</strong> — Keyword, hybrid, and kNN vector retrieval</summary>
 
 | Tool | Agent | Strategy | Index |
 |------|-------|----------|-------|
@@ -181,11 +188,12 @@ Vigil provides **29 purpose-built tools** across three categories: 16 ES|QL anal
 | `vigil-search-runbooks` | Commander | Hybrid (keyword + vector) | vigil-runbooks |
 | `vigil-search-baselines` | Verifier | Keyword | vigil-baselines |
 | `vigil-search-incident-patterns` | Analyst | Hybrid (keyword + vector) | vigil-incidents |
+| `vigil-search-incidents-for-report` | Reporter | Hybrid (keyword + vector) | vigil-incidents |
 
 </details>
 
 <details>
-<summary><strong>6 Elastic Workflows</strong> — YAML-defined automation pipelines</summary>
+<summary><strong>7 Elastic Workflows</strong> — YAML-defined automation pipelines</summary>
 
 | Workflow | Trigger | External Systems |
 |----------|---------|-----------------|
@@ -195,6 +203,7 @@ Vigil provides **29 purpose-built tools** across three categories: 16 ES|QL anal
 | `vigil-wf-ticketing` | Create/update ticket | Jira REST API v3 |
 | `vigil-wf-approval` | Human approval for high-impact actions | Slack interactive buttons |
 | `vigil-wf-reporting` | Post-incident summary aggregation | Elasticsearch (self-index) |
+| `vigil-wf-report-delivery` | Scheduled report delivery to channels | Slack, Email, Jira |
 
 </details>
 
@@ -239,7 +248,7 @@ The `npm run bootstrap` command executes a 9-step initialization sequence:
 | Step | Action | What It Creates |
 |:----:|--------|-----------------|
 | 1 | Create ILM policies | `vigil-90d-policy`, `vigil-1y-policy` |
-| 2 | Create index templates | Mappings for all 10 indices |
+| 2 | Create index templates | Mappings for all 11 indices |
 | 3 | Create data streams & indices | `vigil-incidents`, `vigil-actions-*`, etc. |
 | 4 | Configure inference endpoint | Embedding model for vector search |
 | 5 | Create ingest pipelines | Auto-embedding on document ingest |
@@ -328,6 +337,7 @@ vigil/
 │   │   ├── investigator/            # Root cause analysis agent
 │   │   ├── sentinel/                # Operational monitoring agent
 │   │   ├── threat-hunter/           # Environment sweep agent
+│   │   ├── reporter/                # Scheduled reporting agent
 │   │   └── triage/                  # Priority scoring agent
 │   ├── embeddings/                  # Embedding service + ingest pipeline
 │   ├── scoring/                     # Priority scoring formula
@@ -371,7 +381,7 @@ vigil/
 
 ## Data Model
 
-Vigil operates across **10 Elasticsearch indices** optimized for their access patterns:
+Vigil operates across **11 Elasticsearch indices** optimized for their access patterns:
 
 | Index | Type | ILM Policy | Purpose |
 |-------|------|-----------|---------|
@@ -385,6 +395,7 @@ Vigil operates across **10 Elasticsearch indices** optimized for their access pa
 | `vigil-agent-telemetry` | Standard | vigil-90d-policy | Agent tool execution logs |
 | `github-events-*` | Data stream | vigil-90d-policy | GitHub webhook event store |
 | `vigil-learnings` | Standard | vigil-1y-policy | Analyst learning records (weights, runbooks, patterns) |
+| `vigil-reports` | Standard | vigil-1y-policy | Generated reports (executive, compliance, operational, agent performance) |
 
 ---
 
@@ -406,6 +417,7 @@ Vigil operates across **10 Elasticsearch indices** optimized for their access pa
 | **Kubernetes** | `K8S_CONTEXT`, `DEMO_NAMESPACE` | Pod management |
 | **Embeddings** | `EMBEDDING_PROVIDER`, `OPENAI_API_KEY`, `COHERE_API_KEY` | Vector search embeddings |
 | **Vigil Tuning** | `VIGIL_MAX_REFLECTION_LOOPS`, `VIGIL_APPROVAL_TIMEOUT_MINUTES`, `VIGIL_TRIAGE_*_THRESHOLD`, `VIGIL_ANOMALY_STDDEV_THRESHOLD` | Platform behavior tuning |
+| **Reporting** | `REPORT_EXEC_DAILY_SCHEDULE`, `REPORT_EXEC_WEEKLY_SCHEDULE`, `REPORT_COMPLIANCE_SCHEDULE`, `REPORT_OPS_WEEKLY_SCHEDULE`, `REPORT_AGENT_WEEKLY_SCHEDULE` | Report generation schedules (cron) |
 
 See [`.env.example`](.env.example) for the complete template with all variables.
 
@@ -436,9 +448,9 @@ Built with **Elasticsearch Agent Builder**.
 
 Vigil demonstrates the following Elastic features:
 
-- **Elasticsearch Agent Builder** — 9 agents with custom system prompts, scoped tool access, and ReAct reasoning
-- **ES|QL** — 16 parameterized query tools including `LOOKUP JOIN` for cross-index change correlation
-- **Elastic Workflows** — 6 YAML-defined automation pipelines with external API integration
+- **Elasticsearch Agent Builder** — 9 agents with custom system prompts, scoped tool access, and ReAct reasoning (+ Reporter and Chat auxiliary agents)
+- **ES|QL** — 21 parameterized query tools including `LOOKUP JOIN` for cross-index change correlation
+- **Elastic Workflows** — 7 YAML-defined automation pipelines with external API integration
 - **A2A Protocol** — Hub-and-spoke inter-agent communication with structured contracts
 - **Dense Vector Search** — 1024-dim embeddings with `int8_hnsw` quantization for hybrid retrieval
 - **Data Streams & ILM** — Time-series data management with automated lifecycle policies

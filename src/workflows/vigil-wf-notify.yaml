@@ -1,0 +1,122 @@
+name: vigil-wf-notify
+description: Send notifications to Slack, PagerDuty, or email
+triggers:
+  - type: api
+    enabled: true
+
+params:
+  incident_id: { type: string, required: true }
+  severity:    { type: string, required: true }
+  channel:     { type: string, required: true }
+  message:     { type: string, required: true }
+  details:     { type: object, required: false }
+
+steps:
+  - id: route_slack
+    type: webhook
+    condition: "{{params.channel == 'slack'}}"
+    on_failure: notify_failure
+    config:
+      url: "https://slack.com/api/chat.postMessage"
+      method: POST
+      headers:
+        Authorization: "Bearer {{secrets.slack_bot_token}}"
+        Content-Type: "application/json"
+      body:
+        channel: "{{secrets.slack_incident_channel}}"
+        blocks:
+          - type: header
+            text:
+              type: plain_text
+              text: "Vigil Incident: {{params.incident_id}}"
+          - type: section
+            text:
+              type: mrkdwn
+              text: "*Severity:* {{params.severity}} | *Time:* {{now}}"
+          - type: divider
+          - type: section
+            text:
+              type: mrkdwn
+              text: "{{params.message}}"
+          - type: section
+            fields:
+              - type: mrkdwn
+                text: "*Affected Services:*\n{{params.details.affected_services}}"
+              - type: mrkdwn
+                text: "*Root Cause:*\n{{params.details.root_cause}}"
+          - type: context
+            elements:
+              - type: mrkdwn
+                text: "Sent by Vigil Autonomous SOC | <{{secrets.kibana_url}}/app/vigil/incident/{{params.incident_id}}|View in Kibana>"
+
+  - id: route_pagerduty
+    type: webhook
+    condition: "{{params.severity == 'critical' AND params.channel == 'pagerduty'}}"
+    on_failure: notify_failure
+    config:
+      url: "https://events.pagerduty.com/v2/enqueue"
+      method: POST
+      headers:
+        Content-Type: "application/json"
+      body:
+        routing_key: "{{secrets.pagerduty_routing_key}}"
+        event_action: "trigger"
+        dedup_key: "vigil-{{params.incident_id}}"
+        payload:
+          summary: "Vigil {{params.incident_id}}: {{params.message}}"
+          severity: "critical"
+          source: "vigil-autonomous-soc"
+          component: "{{params.details.affected_services}}"
+          group: "vigil-incidents"
+          class: "{{params.details.incident_type}}"
+          custom_details:
+            incident_id: "{{params.incident_id}}"
+            root_cause: "{{params.details.root_cause}}"
+            affected_services: "{{params.details.affected_services}}"
+        links:
+          - href: "{{secrets.kibana_url}}/app/vigil/incident/{{params.incident_id}}"
+            text: "View in Vigil Dashboard"
+
+  - id: route_email
+    type: webhook
+    condition: "{{params.channel == 'email'}}"
+    on_failure: notify_failure
+    config:
+      url: "{{secrets.email_api_url}}"
+      method: POST
+      headers:
+        Authorization: "Bearer {{secrets.email_api_key}}"
+        Content-Type: "application/json"
+      body:
+        to: "{{secrets.incident_email_recipients}}"
+        subject: "[Vigil {{params.severity | upper}}] {{params.incident_id}}: {{params.message}}"
+        html: "<h2>Vigil Incident Report</h2><p><strong>Incident:</strong> {{params.incident_id}}</p><p><strong>Severity:</strong> {{params.severity}}</p><p><strong>Message:</strong> {{params.message}}</p>"
+
+  - id: log_notification
+    type: index
+    config:
+      index: vigil-actions
+      document:
+        "@timestamp": "{{now}}"
+        action_id: "{{generate_id()}}"
+        incident_id: "{{params.incident_id}}"
+        agent_name: "vigil-executor"
+        action_type: "communication"
+        action_detail: "Notification sent via {{params.channel}}"
+        target_system: "{{params.channel}}"
+        execution_status: "completed"
+
+  - id: notify_failure
+    type: index
+    config:
+      index: vigil-actions
+      document:
+        "@timestamp": "{{now}}"
+        action_id: "{{generate_id()}}"
+        incident_id: "{{params.incident_id}}"
+        agent_name: "vigil-executor"
+        action_type: "communication"
+        action_detail: "Notification via {{params.channel}} FAILED"
+        target_system: "{{params.channel}}"
+        execution_status: "failed"
+        error_message: "{{error.message}}"

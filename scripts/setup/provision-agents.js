@@ -311,6 +311,69 @@ async function registerCoordinatorTools() {
   return true;
 }
 
+// --- Executor Custom Tools ---
+
+const executorTools = [
+  {
+    name: 'vigil-tool-audit-log',
+    type: 'index',
+    config: {
+      description: 'Log action audit records to the vigil-actions data stream',
+      index: 'vigil-actions',
+      operations: ['create'],
+      document_template: {
+        '@timestamp': '{{now}}',
+        action_id: '{{params.action_id}}',
+        incident_id: '{{params.incident_id}}',
+        agent_name: 'vigil-executor',
+        action_type: '{{params.action_type}}',
+        action_detail: '{{params.action_detail}}',
+        target_system: '{{params.target_system}}',
+        target_asset: '{{params.target_asset}}',
+        approval_required: '{{params.approval_required}}',
+        approved_by: '{{params.approved_by}}',
+        execution_status: '{{params.execution_status}}',
+        started_at: '{{params.started_at}}',
+        completed_at: '{{params.completed_at}}',
+        duration_ms: '{{params.duration_ms}}',
+        result_summary: '{{params.result_summary}}',
+        rollback_available: '{{params.rollback_available}}',
+        error_message: '{{params.error_message}}',
+        workflow_id: '{{params.workflow_id}}'
+      }
+    }
+  }
+];
+
+async function registerExecutorTools() {
+  for (const tool of executorTools) {
+    try {
+      const resp = await axios.post(
+        `${KIBANA_URL}/api/agent_builder/tools`,
+        tool,
+        {
+          headers: {
+            'kbn-xsrf': 'true',
+            'Authorization': `ApiKey ${ELASTIC_API_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      log.info(`Registered tool: ${tool.name} (id: ${resp.data.id || 'ok'})`);
+    } catch (err) {
+      if (err.response?.status === 409) {
+        log.warn(`Tool already exists: ${tool.name}`);
+      } else if (err.response?.status === 404) {
+        log.warn(`Agent Builder Tools API not available. Skipping tool registration.`);
+        return false;
+      } else {
+        log.error(`Failed to register tool ${tool.name}: ${err.message}`);
+      }
+    }
+  }
+  return true;
+}
+
 // --- Agent Registration (unchanged) ---
 
 async function registerAgent(agentConfig) {
@@ -363,8 +426,9 @@ async function run() {
     process.exit(1);
   }
 
-  // Register coordinator custom tools before agent registration
+  // Register custom tools before agent registration
   await registerCoordinatorTools();
+  await registerExecutorTools();
 
   let agentBuilderAvailable = true;
 

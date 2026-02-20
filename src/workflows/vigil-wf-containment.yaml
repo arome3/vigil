@@ -1,0 +1,58 @@
+name: vigil-wf-containment
+description: Execute containment actions (block IP, disable account, isolate host, revoke key)
+triggers:
+  - type: api
+    enabled: true
+
+params:
+  incident_id:   { type: string, required: true }
+  action_type:   { type: string, required: true }
+  target_value:  { type: string, required: true }
+  target_system: { type: string, required: true }
+
+steps:
+  - id: validate_target
+    type: condition
+    config:
+      if: "{{params.target_system IN ['cloudflare', 'okta', 'endpoint-agent', 'secrets-manager']}}"
+      then: execute_containment
+      else: notify_failure
+
+  - id: execute_containment
+    type: webhook
+    config:
+      url: "{{resolve_url(params.action_type, params.target_system)}}"
+      method: POST
+      headers:
+        Authorization: "Bearer {{secrets[params.target_system + '_token']}}"
+        Content-Type: "application/json"
+      body: "{{resolve_body(params.action_type, params.target_value)}}"
+    on_failure: notify_failure
+
+  - id: log_action
+    type: index
+    config:
+      index: vigil-actions
+      document:
+        "@timestamp": "{{now}}"
+        action_id: "{{generate_id()}}"
+        incident_id: "{{params.incident_id}}"
+        agent_name: "vigil-executor"
+        action_type: "containment"
+        action_detail: "{{params.action_type}} on {{params.target_value}}"
+        target_system: "{{params.target_system}}"
+        execution_status: "completed"
+        started_at: "{{step.execute_containment.started_at}}"
+        completed_at: "{{now}}"
+        rollback_available: true
+
+  - id: notify_failure
+    type: webhook
+    condition: "{{step.execute_containment.status == 'failed'}}"
+    config:
+      url: "{{secrets.slack_webhook}}"
+      method: POST
+      headers:
+        Content-Type: "application/json"
+      body:
+        text: "Containment FAILED for {{params.incident_id}}: {{params.action_type}} on {{params.target_value}}. Error: {{step.execute_containment.error}}"

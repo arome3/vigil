@@ -63,7 +63,7 @@ function buildSearchResponse(value, user = '@sre-oncall') {
           action_id: 'ACT-2026-AAAAA',
           value,
           user,
-          timestamp: '2026-02-17T14:24:15Z'
+          '@timestamp': '2026-02-17T14:24:15Z'
         }
       }]
     }
@@ -96,7 +96,7 @@ describe('approval-gate', () => {
             task: 'request_approval',
             incident_id: 'INC-2026-TEST1',
             action_id: 'ACT-2026-AAAAA',
-            action_description: 'Rollback api-gateway'
+            action_summary: 'Rollback api-gateway'
           })
         }),
         { timeout: 30_000 }
@@ -138,6 +138,40 @@ describe('approval-gate', () => {
       expect(result.decided_by).toBe('@ciso');
     });
 
+    test('accepts "approved" value (defensive matching)', async () => {
+      mockSearch.mockResolvedValue(buildSearchResponse('approved', '@security-lead'));
+
+      const result = await checkApprovalGate(
+        'INC-2026-TEST1', SAMPLE_ACTION, 'ACT-2026-AAAAA', FAST_OPTIONS
+      );
+
+      expect(result.status).toBe('approved');
+      expect(result.decided_by).toBe('@security-lead');
+    });
+
+    test('accepts "rejected" value (defensive matching)', async () => {
+      mockSearch.mockResolvedValue(buildSearchResponse('rejected', '@ciso'));
+
+      const result = await checkApprovalGate(
+        'INC-2026-TEST1', SAMPLE_ACTION, 'ACT-2026-AAAAA', FAST_OPTIONS
+      );
+
+      expect(result.status).toBe('rejected');
+      expect(result.decided_by).toBe('@ciso');
+    });
+
+    test('continues polling on "info" response (defensive matching)', async () => {
+      mockSearch
+        .mockResolvedValueOnce(buildSearchResponse('info'))
+        .mockResolvedValue(buildSearchResponse('approve'));
+
+      const result = await checkApprovalGate(
+        'INC-2026-TEST1', SAMPLE_ACTION, 'ACT-2026-AAAAA', FAST_OPTIONS
+      );
+
+      expect(result.status).toBe('approved');
+    });
+
     test('returns timeout when deadline expires with no decision', async () => {
       mockSearch.mockResolvedValue(buildSearchResponse(null));
 
@@ -172,7 +206,7 @@ describe('approval-gate', () => {
               incident_id: 'INC-2026-TEST1',
               action_id: 'ACT-2026-AAAAA',
               value: 'approve',
-              timestamp: '2026-02-17T14:24:15Z'
+              '@timestamp': '2026-02-17T14:24:15Z'
               // user field missing
             }
           }]
@@ -205,7 +239,7 @@ describe('approval-gate', () => {
       );
     });
 
-    test('sorts by timestamp desc and limits to 1 result', async () => {
+    test('sorts by @timestamp desc and limits to 1 result', async () => {
       mockSearch.mockResolvedValue(buildSearchResponse('approve'));
 
       await checkApprovalGate(
@@ -213,8 +247,38 @@ describe('approval-gate', () => {
       );
 
       const searchArgs = mockSearch.mock.calls[0][0];
-      expect(searchArgs.sort).toEqual([{ timestamp: 'desc' }]);
+      expect(searchArgs.sort).toEqual([{ '@timestamp': 'desc' }]);
       expect(searchArgs.size).toBe(1);
+    });
+
+    test('handles empty action_id in query filter', async () => {
+      mockSearch.mockResolvedValue(buildSearchResponse('approve'));
+
+      await checkApprovalGate(
+        'INC-2026-TEST1', SAMPLE_ACTION, '', FAST_OPTIONS
+      );
+
+      const query = mockSearch.mock.calls[0][0].query;
+      expect(query.bool.filter).toEqual(
+        expect.arrayContaining([
+          { term: { action_id: '' } }
+        ])
+      );
+    });
+
+    test('returns latest decision when multiple responses exist', async () => {
+      // Mock returns one hit (the latest by @timestamp sort)
+      mockSearch.mockResolvedValue(buildSearchResponse('reject', '@ciso'));
+
+      const result = await checkApprovalGate(
+        'INC-2026-TEST1', SAMPLE_ACTION, 'ACT-2026-AAAAA', FAST_OPTIONS
+      );
+
+      // Verify sort ensures we get the latest decision
+      const searchArgs = mockSearch.mock.calls[0][0];
+      expect(searchArgs.sort).toEqual([{ '@timestamp': 'desc' }]);
+      expect(searchArgs.size).toBe(1);
+      expect(result.status).toBe('rejected');
     });
   });
 

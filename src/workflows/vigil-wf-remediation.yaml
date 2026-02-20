@@ -1,0 +1,82 @@
+name: vigil-wf-remediation
+description: Execute remediation actions (restart, rollback, scale, rotate credentials)
+triggers:
+  - type: api
+    enabled: true
+
+params:
+  incident_id:    { type: string, required: true }
+  action_type:    { type: string, required: true }
+  target_service: { type: string, required: true }
+  target_params:  { type: object, required: false }
+
+steps:
+  - id: pre_health_check
+    type: esql
+    config:
+      query: |
+        FROM metrics-apm-*
+        | WHERE @timestamp > NOW() - 2m AND service.name == "{{params.target_service}}"
+        | STATS
+            request_count = COUNT(*),
+            error_rate = SUM(CASE(event.outcome == "failure", 1, 0)) / COUNT(*) * 100
+        | KEEP request_count, error_rate
+
+  - id: validate_action_type
+    type: condition
+    config:
+      if: "{{params.action_type IN ['restart_pod', 'rollback_deploy', 'scale_replicas', 'rotate_credentials']}}"
+      then: execute_remediation
+      else: log_failure
+
+  - id: execute_remediation
+    type: webhook
+    config:
+      url: "{{resolve_remediation_url(params.action_type, params.target_service)}}"
+      method: POST
+      headers:
+        Authorization: "Bearer {{secrets[resolve_system(params.action_type) + '_token']}}"
+        Content-Type: "application/json"
+      body: "{{resolve_remediation_body(params)}}"
+      timeout: 120s
+      retry:
+        max_attempts: 2
+        backoff: exponential
+    on_failure: log_failure
+
+  - id: log_action
+    type: index
+    config:
+      index: vigil-actions
+      document:
+        "@timestamp": "{{now}}"
+        action_id: "{{generate_id()}}"
+        incident_id: "{{params.incident_id}}"
+        agent_name: "vigil-executor"
+        action_type: "remediation"
+        action_detail: "{{params.action_type}} on {{params.target_service}}"
+        target_system: "{{resolve_system(params.action_type)}}"
+        target_asset: "{{params.target_service}}"
+        execution_status: "completed"
+        started_at: "{{step.execute_remediation.started_at}}"
+        completed_at: "{{now}}"
+        duration_ms: "{{step.execute_remediation.duration_ms}}"
+        pre_health_check:
+          request_count: "{{step.pre_health_check.results[0].request_count}}"
+          error_rate: "{{step.pre_health_check.results[0].error_rate}}"
+        rollback_available: true
+
+  - id: log_failure
+    type: index
+    condition: "{{step.execute_remediation.status == 'failed'}}"
+    config:
+      index: vigil-actions
+      document:
+        "@timestamp": "{{now}}"
+        action_id: "{{generate_id()}}"
+        incident_id: "{{params.incident_id}}"
+        agent_name: "vigil-executor"
+        action_type: "remediation"
+        action_detail: "{{params.action_type}} on {{params.target_service}}"
+        execution_status: "failed"
+        error_message: "{{step.execute_remediation.error}}"

@@ -1,0 +1,65 @@
+name: vigil-wf-reporting
+description: Generate incident report and index for compliance
+triggers:
+  - type: api
+    enabled: true
+
+params:
+  incident_id: { type: string, required: true }
+
+steps:
+  - id: fetch_incident
+    type: esql
+    config:
+      query: |
+        FROM vigil-incidents
+        | WHERE incident_id == "{{params.incident_id}}"
+        | LIMIT 1
+
+  - id: fetch_actions
+    type: esql
+    config:
+      query: |
+        FROM vigil-actions-*
+        | WHERE incident_id == "{{params.incident_id}}"
+        | SORT started_at ASC
+
+  - id: fetch_investigation
+    type: esql
+    config:
+      query: |
+        FROM vigil-investigations
+        | WHERE incident_id == "{{params.incident_id}}"
+        | SORT created_at DESC
+        | LIMIT 1
+
+  - id: compile_report
+    type: transform
+    config:
+      output:
+        report_id: "RPT-{{params.incident_id}}"
+        report_type: "incident_summary"
+        incident_id: "{{params.incident_id}}"
+        incident: "{{step.fetch_incident.results[0]}}"
+        investigation: "{{step.fetch_investigation.results[0]}}"
+        actions_timeline: "{{step.fetch_actions.results}}"
+        total_actions: "{{step.fetch_actions.results.length}}"
+        actions_completed: "{{step.fetch_actions.results | selectattr('execution_status', 'eq', 'completed') | list | length}}"
+        actions_failed: "{{step.fetch_actions.results | selectattr('execution_status', 'eq', 'failed') | list | length}}"
+        timeline:
+          incident_created: "{{step.fetch_incident.results[0].created_at}}"
+          incident_resolved: "{{step.fetch_incident.results[0].resolved_at}}"
+          total_duration_seconds: "{{step.fetch_incident.results[0].total_duration_seconds}}"
+          ttd_seconds: "{{step.fetch_incident.results[0].ttd_seconds}}"
+          tti_seconds: "{{step.fetch_incident.results[0].tti_seconds}}"
+          ttr_seconds: "{{step.fetch_incident.results[0].ttr_seconds}}"
+          ttv_seconds: "{{step.fetch_incident.results[0].ttv_seconds}}"
+        compliance_tags: "{{step.fetch_incident.results[0].affected_assets[*].compliance_tags}}"
+        generated_at: "{{now}}"
+        generated_by: "vigil-wf-reporting"
+
+  - id: index_report
+    type: index
+    config:
+      index: vigil-reports
+      document: "{{step.compile_report.output}}"

@@ -1,0 +1,114 @@
+name: vigil-wf-ticketing
+description: Create Jira tickets with incident data
+triggers:
+  - type: api
+    enabled: true
+
+params:
+  incident_id: { type: string, required: true }
+  summary:     { type: string, required: true }
+  description: { type: string, required: true }
+  severity:    { type: string, required: true }
+  assignee:    { type: string, required: false }
+
+steps:
+  - id: create_ticket
+    type: webhook
+    config:
+      url: "{{secrets.jira_base_url}}/rest/api/3/issue"
+      method: POST
+      headers:
+        Authorization: "Basic {{secrets.jira_auth}}"
+        Content-Type: "application/json"
+      body:
+        fields:
+          project:
+            key: "{{secrets.jira_project_key}}"
+          summary: "[Vigil {{params.incident_id}}] {{params.summary}}"
+          description:
+            type: doc
+            version: 1
+            content:
+              - type: heading
+                attrs:
+                  level: 2
+                content:
+                  - type: text
+                    text: "Incident Details"
+              - type: paragraph
+                content:
+                  - type: text
+                    text: "{{params.description}}"
+              - type: rule
+              - type: heading
+                attrs:
+                  level: 3
+                content:
+                  - type: text
+                    text: "Metadata"
+              - type: bulletList
+                content:
+                  - type: listItem
+                    content:
+                      - type: paragraph
+                        content:
+                          - type: text
+                            text: "Incident ID: "
+                            marks:
+                              - type: strong
+                          - type: text
+                            text: "{{params.incident_id}}"
+                  - type: listItem
+                    content:
+                      - type: paragraph
+                        content:
+                          - type: text
+                            text: "Severity: "
+                            marks:
+                              - type: strong
+                          - type: text
+                            text: "{{params.severity}}"
+                  - type: listItem
+                    content:
+                      - type: paragraph
+                        content:
+                          - type: text
+                            text: "Created by: "
+                            marks:
+                              - type: strong
+                          - type: text
+                            text: "Vigil Autonomous SOC"
+          issuetype:
+            name: "Bug"
+          priority:
+            name: "{{map_severity_to_jira(params.severity)}}"
+          labels:
+            - "vigil-auto"
+            - "incident-response"
+
+  - id: assign_ticket
+    type: webhook
+    condition: "{{params.assignee}}"
+    config:
+      url: "{{secrets.jira_base_url}}/rest/api/3/issue/{{step.create_ticket.response.key}}/assignee"
+      method: PUT
+      headers:
+        Authorization: "Basic {{secrets.jira_auth}}"
+        Content-Type: "application/json"
+      body:
+        accountId: "{{params.assignee}}"
+
+  - id: log_ticket_creation
+    type: index
+    config:
+      index: vigil-actions
+      document:
+        "@timestamp": "{{now}}"
+        action_id: "{{generate_id()}}"
+        incident_id: "{{params.incident_id}}"
+        agent_name: "vigil-executor"
+        action_type: "documentation"
+        action_detail: "Jira ticket created: {{step.create_ticket.response.key}}"
+        target_system: "jira"
+        execution_status: "completed"
+        result_summary: "Ticket {{step.create_ticket.response.key}} created in project {{secrets.jira_project_key}}"

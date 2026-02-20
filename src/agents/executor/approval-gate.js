@@ -49,7 +49,7 @@ export async function checkApprovalGate(incidentId, action, actionId, options = 
     task: 'request_approval',
     incident_id: incidentId,
     action_id: actionId,
-    action_description: action.description,
+    action_summary: action.description,
     action_type: action.action_type,
     target_system: action.target_system,
     target_asset: action.target_asset || null,
@@ -72,8 +72,6 @@ export async function checkApprovalGate(incidentId, action, actionId, options = 
   let consecutiveErrors = 0;
 
   while (Date.now() < deadline) {
-    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
-
     let searchResult;
     try {
       searchResult = await client.search({
@@ -86,7 +84,7 @@ export async function checkApprovalGate(incidentId, action, actionId, options = 
             ]
           }
         },
-        sort: [{ timestamp: 'desc' }],
+        sort: [{ '@timestamp': 'desc' }],
         size: 1
       });
       // Reset error counter on successful poll
@@ -101,31 +99,44 @@ export async function checkApprovalGate(incidentId, action, actionId, options = 
           `Approval polling failed ${MAX_POLL_ERRORS} consecutive times for action ${actionId}: ${err.message}`
         );
       }
-      // Transient error — retry on next poll interval
+      // Transient error — sleep and retry on next poll interval
+      if (Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+      }
       continue;
     }
 
     const hit = searchResult.hits?.hits?.[0]?._source;
-    if (!hit) continue;
+    if (!hit) {
+      // No decision yet — sleep and continue polling
+      if (Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+      }
+      continue;
+    }
 
-    if (hit.value === 'approve') {
+    if (hit.value === 'approve' || hit.value === 'approved') {
       log.info(`Approval granted for action ${actionId} by ${hit.user || 'unknown'}`);
-      return { status: 'approved', decided_by: hit.user || 'unknown', decided_at: hit.timestamp };
+      return { status: 'approved', decided_by: hit.user || 'unknown', decided_at: hit['@timestamp'] || null };
     }
 
-    if (hit.value === 'reject') {
+    if (hit.value === 'reject' || hit.value === 'rejected') {
       log.info(`Approval rejected for action ${actionId} by ${hit.user || 'unknown'}`);
-      return { status: 'rejected', decided_by: hit.user || 'unknown', decided_at: hit.timestamp };
+      return { status: 'rejected', decided_by: hit.user || 'unknown', decided_at: hit['@timestamp'] || null };
     }
 
-    if (hit.value === 'more_info') {
+    if (hit.value === 'more_info' || hit.value === 'info') {
       // The approver wants additional context before deciding. The Executor
       // does not currently have a mechanism to push context back into the Slack
       // thread — this would require a dedicated "approval-context" workflow.
       // For now, we log the request and continue polling. The total approval
       // window remains fixed (no deadline extension) to prevent indefinite waits.
       log.info(`Approver requested more info for ${actionId} in incident ${incidentId}`);
-      continue;
+    }
+
+    // Sleep after the poll, not before
+    if (Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
     }
   }
 
