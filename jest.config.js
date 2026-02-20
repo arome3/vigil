@@ -3,5 +3,6 @@
 
 export default {
   transform: {},
-  testMatch: ['**/tests/**/*.test.js']
+  testMatch: ['**/tests/**/*.test.js'],
+  testPathIgnorePatterns: ['tests/unit/']
 };

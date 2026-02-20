@@ -33,7 +33,7 @@ export function validateEnvelope(envelope) {
   if (!envelope.correlation_id || typeof envelope.correlation_id !== 'string') {
     errors.push('correlation_id is required and must be a string');
   }
-  if (!envelope.payload || typeof envelope.payload !== 'object') {
+  if (!envelope.payload || typeof envelope.payload !== 'object' || Array.isArray(envelope.payload)) {
     errors.push('payload is required and must be an object');
   }
 

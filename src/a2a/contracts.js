@@ -54,6 +54,25 @@ export function buildTriageRequest(alert) {
   };
 }
 
+export function validateTriageRequest(req) {
+  const errors = [];
+  requireField(req, 'task', 'string', errors);
+  if (req.task && req.task !== 'enrich_and_score') {
+    errors.push(`task must be 'enrich_and_score', got '${req.task}'`);
+  }
+  requireField(req, 'alert', 'object', errors);
+  if (req.alert && typeof req.alert === 'object') {
+    requireField(req.alert, 'alert_id', 'string', errors, 'alert.alert_id');
+    requireField(req.alert, 'rule_id', 'string', errors, 'alert.rule_id');
+    requireField(req.alert, 'severity_original', 'string', errors, 'alert.severity_original');
+    requireField(req.alert, 'source_ip', 'string', errors, 'alert.source_ip');
+    requireField(req.alert, 'source_user', 'string', errors, 'alert.source_user');
+    requireField(req.alert, 'affected_asset_id', 'string', errors, 'alert.affected_asset_id');
+  }
+  if (errors.length > 0) throw new ContractValidationError('triage_request', errors);
+  return true;
+}
+
 export function validateTriageResponse(resp) {
   const errors = [];
   requireField(resp, 'alert_id', 'string', errors);
@@ -102,6 +121,19 @@ export function buildInvestigateRequest(incidentId, incidentType, alertContext, 
   return payload;
 }
 
+export function validateInvestigateRequest(req) {
+  const errors = [];
+  requireField(req, 'task', 'string', errors);
+  if (req.task && req.task !== 'investigate') {
+    errors.push(`task must be 'investigate', got '${req.task}'`);
+  }
+  requireField(req, 'incident_id', 'string', errors);
+  requireField(req, 'incident_type', 'string', errors);
+  requireField(req, 'alert_context', 'object', errors);
+  if (errors.length > 0) throw new ContractValidationError('investigate_request', errors);
+  return true;
+}
+
 export function validateInvestigateResponse(resp) {
   const errors = [];
   requireField(resp, 'investigation_id', 'string', errors);
@@ -139,6 +171,17 @@ export function buildSweepRequest(incidentId, indicators, knownCompromisedUsers)
   };
 }
 
+export function validateSweepRequest(req) {
+  const errors = [];
+  requireField(req, 'task', 'string', errors);
+  if (req.task && req.task !== 'sweep_environment') {
+    errors.push(`task must be 'sweep_environment', got '${req.task}'`);
+  }
+  requireField(req, 'incident_id', 'string', errors);
+  if (errors.length > 0) throw new ContractValidationError('sweep_request', errors);
+  return true;
+}
+
 export function validateSweepResponse(resp) {
   const errors = [];
   requireField(resp, 'incident_id', 'string', errors);
@@ -164,6 +207,19 @@ export function buildPlanRequest(incidentId, severity, investigationReport, thre
     threat_scope: threatScope || null,
     affected_services: affectedServices || []
   };
+}
+
+export function validatePlanRequest(req) {
+  const errors = [];
+  requireField(req, 'task', 'string', errors);
+  if (req.task && req.task !== 'plan_remediation') {
+    errors.push(`task must be 'plan_remediation', got '${req.task}'`);
+  }
+  requireField(req, 'incident_id', 'string', errors);
+  requireField(req, 'severity', 'string', errors);
+  requireField(req, 'investigation_report', 'object', errors);
+  if (errors.length > 0) throw new ContractValidationError('plan_request', errors);
+  return true;
 }
 
 export function validatePlanResponse(resp) {
@@ -215,6 +271,18 @@ export function buildExecuteRequest(incidentId, remediationPlan) {
   };
 }
 
+export function validateExecuteRequest(req) {
+  const errors = [];
+  requireField(req, 'task', 'string', errors);
+  if (req.task && req.task !== 'execute_plan') {
+    errors.push(`task must be 'execute_plan', got '${req.task}'`);
+  }
+  requireField(req, 'incident_id', 'string', errors);
+  requireField(req, 'remediation_plan', 'object', errors);
+  if (errors.length > 0) throw new ContractValidationError('execute_request', errors);
+  return true;
+}
+
 export function validateExecuteResponse(resp) {
   const errors = [];
   requireField(resp, 'incident_id', 'string', errors);
@@ -243,6 +311,19 @@ export function buildVerifyRequest(incidentId, affectedServices, successCriteria
     affected_services: affectedServices,
     success_criteria: successCriteria
   };
+}
+
+export function validateVerifyRequest(req) {
+  const errors = [];
+  requireField(req, 'task', 'string', errors);
+  if (req.task && req.task !== 'verify_resolution') {
+    errors.push(`task must be 'verify_resolution', got '${req.task}'`);
+  }
+  requireField(req, 'incident_id', 'string', errors);
+  requireField(req, 'affected_services', 'array', errors);
+  requireField(req, 'success_criteria', 'array', errors);
+  if (errors.length > 0) throw new ContractValidationError('verify_request', errors);
+  return true;
 }
 
 export function validateVerifyResponse(resp) {
