@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { transitionIncident, getIncident } from '../../state-machine/transitions.js';
+import { evaluateGuard } from '../../state-machine/guards.js';
 import { sendA2AMessage } from '../../a2a/router.js';
 import { createEnvelope } from '../../a2a/message-envelope.js';
 import {
@@ -13,11 +14,13 @@ import { escalateIncident, checkConflictingAssessments, checkApprovalTimeout } f
 import { computeTimingMetrics } from './timing.js';
 import client from '../../utils/elastic-client.js';
 import { createLogger } from '../../utils/logger.js';
+import { parseThreshold, parsePositiveInt } from '../../utils/env.js';
 
 const log = createLogger('coordinator-delegation');
 
-const SUPPRESS_THRESHOLD = parseFloat(process.env.VIGIL_TRIAGE_SUPPRESS_THRESHOLD || '0.4');
-const APPROVAL_TIMEOUT_MINUTES = parseInt(process.env.VIGIL_APPROVAL_TIMEOUT_MINUTES || '15', 10);
+const SUPPRESS_THRESHOLD = parseThreshold('VIGIL_TRIAGE_SUPPRESS_THRESHOLD', 0.4);
+const APPROVAL_TIMEOUT_MINUTES = parsePositiveInt('VIGIL_APPROVAL_TIMEOUT_MINUTES', 15);
+const MAX_REFLECTION_LOOPS = parsePositiveInt('VIGIL_MAX_REFLECTION_LOOPS', 3);
 const APPROVAL_POLL_INTERVAL_MS = 15_000; // 15 seconds
 
 // --- Helpers ---
@@ -172,10 +175,15 @@ export async function orchestrateSecurityIncident(triageResponse) {
   const incidentId = generateIncidentId();
   log.info(`Starting security incident orchestration: ${incidentId}`);
 
-  // Suppress low-priority alerts
-  if (triageResponse.priority_score < SUPPRESS_THRESHOLD) {
-    const doc = await createIncidentDocument(incidentId, triageResponse, 'security');
-    await transitionIncident(incidentId, 'triaged');
+  // Create incident and transition to triaged (common to both paths)
+  await createIncidentDocument(incidentId, triageResponse, 'security');
+  await transitionIncident(incidentId, 'triaged');
+
+  // Evaluate suppress guard against the triaged document
+  const { doc: triagedDoc } = await getIncident(incidentId);
+  const suppressGuard = evaluateGuard(triagedDoc, 'triaged', 'suppressed');
+
+  if (suppressGuard.allowed) {
     await transitionIncident(incidentId, 'suppressed', {
       suppression_reason: triageResponse.suppression_reason || 'Priority score below threshold'
     });
@@ -183,9 +191,7 @@ export async function orchestrateSecurityIncident(triageResponse) {
     return { incidentId, status: 'suppressed' };
   }
 
-  // Create incident and transition through initial states
-  await createIncidentDocument(incidentId, triageResponse, 'security');
-  await transitionIncident(incidentId, 'triaged');
+  // Investigate path
   await transitionIncident(incidentId, 'investigating');
 
   // Build alert context for investigator
@@ -383,22 +389,31 @@ async function executeFromPlanning(incidentId, investigatorResp, threatHunterRes
   });
 
   // --- Approval Gate ---
-  const needsApproval = commanderResp.remediation_plan.actions.some(a => a.approval_required === true);
+  const { doc: planDoc } = await getIncident(incidentId);
+  const approvalGuard = evaluateGuard(planDoc, 'planning', 'awaiting_approval', {
+    remediationPlan: commanderResp.remediation_plan
+  });
 
-  if (needsApproval) {
+  if (approvalGuard.allowed) {
     await transitionIncident(incidentId, 'awaiting_approval');
 
     const approvalResult = await waitForApproval(incidentId);
 
     if (approvalResult === 'timeout' || approvalResult === 'rejected') {
-      await transitionIncident(incidentId, 'escalated');
-      const { doc } = await getIncident(incidentId);
-      await escalateIncident(doc, `Approval ${approvalResult} for critical actions`, {
-        root_cause: investigatorResp.root_cause,
-        affected_services: affectedServices,
-        remediation_attempts: commanderResp.remediation_plan
+      const { doc: awaitDoc } = await getIncident(incidentId);
+      const deniedGuard = evaluateGuard(awaitDoc, 'awaiting_approval', 'escalated', {
+        approvalStatus: approvalResult
       });
-      return { incidentId, status: 'escalated', reason: `approval_${approvalResult}` };
+      if (deniedGuard.allowed) {
+        await transitionIncident(incidentId, 'escalated');
+        const { doc } = await getIncident(incidentId);
+        await escalateIncident(doc, `Approval ${approvalResult} for critical actions`, {
+          root_cause: investigatorResp.root_cause,
+          affected_services: affectedServices,
+          remediation_attempts: commanderResp.remediation_plan
+        });
+        return { incidentId, status: 'escalated', reason: `approval_${approvalResult}` };
+      }
     }
   }
 
@@ -448,7 +463,12 @@ async function executeFromPlanning(incidentId, investigatorResp, threatHunterRes
   await updateIncidentFields(incidentId, { verification_results: verificationResults });
 
   // --- Resolution or Reflection ---
-  if (verifierResp.passed) {
+  const { doc: verifyDoc } = await getIncident(incidentId);
+  const passGuard = evaluateGuard(verifyDoc, 'verifying', 'resolved', {
+    verifierResponse: verifierResp
+  });
+
+  if (passGuard.allowed) {
     // Compute timing metrics and resolve
     const { doc: resolvedDoc } = await getIncident(incidentId);
     const metrics = computeTimingMetrics(resolvedDoc);
@@ -476,19 +496,18 @@ export async function handleReflectionLoop(
   threatHunterResp, alertContext, affectedServices,
   failureAnalysis, incidentType
 ) {
-  const MAX_ITERATIONS = parseInt(process.env.VIGIL_MAX_REFLECTION_LOOPS || '3', 10);
   let currentFailureAnalysis = failureAnalysis;
   let lastInvestigatorResp = originalInvestigatorResp;
   let lastCommanderResp = originalCommanderResp;
 
-  for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+  for (let iteration = 0; iteration < MAX_REFLECTION_LOOPS; iteration++) {
     // transitionIncident will auto-escalate if reflection_count >= MAX
     const updatedDoc = await transitionIncident(incidentId, 'reflecting');
 
     // Check if auto-escalation was triggered by the state machine guard
     if (updatedDoc.status === 'escalated') {
       const { doc } = await getIncident(incidentId);
-      await escalateIncident(doc, `Reflection limit reached (${MAX_ITERATIONS}/${MAX_ITERATIONS})`, {
+      await escalateIncident(doc, `Reflection limit reached (${MAX_REFLECTION_LOOPS}/${MAX_REFLECTION_LOOPS})`, {
         root_cause: lastInvestigatorResp.root_cause,
         affected_services: affectedServices,
         remediation_attempts: lastCommanderResp.remediation_plan,
@@ -601,7 +620,11 @@ export async function handleReflectionLoop(
     const verificationResults = [...(currentDoc.verification_results || []), verifierResp];
     await updateIncidentFields(incidentId, { verification_results: verificationResults });
 
-    if (verifierResp.passed) {
+    const reflectPassGuard = evaluateGuard(currentDoc, 'verifying', 'resolved', {
+      verifierResponse: verifierResp
+    });
+
+    if (reflectPassGuard.allowed) {
       const { doc: resolvedDoc } = await getIncident(incidentId);
       const metrics = computeTimingMetrics(resolvedDoc);
       await transitionIncident(incidentId, 'resolved', {
@@ -618,7 +641,7 @@ export async function handleReflectionLoop(
 
   // Exhausted all iterations without resolution — escalate
   const { doc } = await getIncident(incidentId);
-  await escalateIncident(doc, `Reflection limit reached (${MAX_ITERATIONS}/${MAX_ITERATIONS})`, {
+  await escalateIncident(doc, `Reflection limit reached (${MAX_REFLECTION_LOOPS}/${MAX_REFLECTION_LOOPS})`, {
     root_cause: lastInvestigatorResp.root_cause,
     affected_services: affectedServices,
     remediation_attempts: lastCommanderResp.remediation_plan,

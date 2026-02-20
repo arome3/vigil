@@ -12,21 +12,9 @@ import {
 import { validateTriageResponse } from '../../a2a/contracts.js';
 import client from '../../utils/elastic-client.js';
 import { createLogger } from '../../utils/logger.js';
+import { parseThreshold } from '../../utils/env.js';
 
 const log = createLogger('triage-handler');
-
-// Configurable thresholds via environment variables.
-// Uses nullish coalescing (not ||) so that 0.0 is a valid explicit value.
-function parseThreshold(envVar, defaultVal) {
-  const raw = process.env[envVar];
-  if (raw === undefined || raw === '') return defaultVal;
-  const parsed = parseFloat(raw);
-  if (Number.isNaN(parsed) || parsed < 0 || parsed > 1) {
-    log.warn(`Invalid ${envVar}='${raw}' (must be 0.0–1.0). Using default ${defaultVal}.`);
-    return defaultVal;
-  }
-  return parsed;
-}
 
 const INVESTIGATE_THRESHOLD = parseThreshold('VIGIL_TRIAGE_INVESTIGATE_THRESHOLD', 0.7);
 const SUPPRESS_THRESHOLD = parseThreshold('VIGIL_TRIAGE_SUPPRESS_THRESHOLD', 0.4);

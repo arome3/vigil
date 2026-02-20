@@ -1,10 +1,11 @@
 import client from '../utils/elastic-client.js';
 import { createLogger } from '../utils/logger.js';
+import { parsePositiveInt } from '../utils/env.js';
 import { v4 as uuidv4 } from 'uuid';
 
 const log = createLogger('state-machine');
 
-const MAX_REFLECTION_LOOPS = parseInt(process.env.VIGIL_MAX_REFLECTION_LOOPS || '3', 10);
+const MAX_REFLECTION_LOOPS = parsePositiveInt('VIGIL_MAX_REFLECTION_LOOPS', 3);
 
 // --- Error Classes ---
 
