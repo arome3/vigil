@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@elastic/elasticsearch": "^8.17.0",
+    "@kubernetes/client-node": "^1.4.0",
     "@slack/web-api": "^7.0.0",
     "axios": "^1.7.0",
     "dotenv": "^16.4.0",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@jest/globals": "^30.2.0",
-    "jest": "^30.2.0"
+    "jest": "^30.2.0",
+    "supertest": "^7.2.2"
   }
 }
