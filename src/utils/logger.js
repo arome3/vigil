@@ -2,8 +2,10 @@ import winston from 'winston';
 
 const { combine, timestamp, label: labelFormat, colorize, printf } = winston.format;
 
-const logFormat = printf(({ level, message, label, timestamp }) => {
-  return `${timestamp} [${label}] ${level}: ${message}`;
+const logFormat = printf(({ level, message, label, timestamp, ...rest }) => {
+  const base = `${timestamp} [${label}] ${level}: ${message}`;
+  const extra = Object.keys(rest).length > 0 ? ' ' + JSON.stringify(rest) : '';
+  return base + extra;
 });
 
 export function createLogger(label) {

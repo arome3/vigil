@@ -1,0 +1,25 @@
+{
+  "name": "vigil-analyst",
+  "description": "Asynchronous post-incident learning agent that calibrates scoring weights, generates runbooks, tunes thresholds, discovers attack patterns, and produces retrospectives.",
+  "system_prompt_file": "system-prompt.md",
+  "tools": [
+    "vigil-esql-incident-outcomes",
+    "vigil-esql-triage-calibration",
+    "vigil-esql-threshold-analysis",
+    "vigil-esql-remediation-effectiveness",
+    "vigil-search-incident-patterns"
+  ],
+  "a2a_connections": [],
+  "config": {
+    "execution_mode": "asynchronous",
+    "trigger": "incident_terminal_state"
+  },
+  "api_key_role_descriptors": {
+    "vigil_analyst": {
+      "indices": [
+        { "names": ["vigil-incidents", "vigil-actions-*", "vigil-baselines", "vigil-runbooks", "vigil-agent-telemetry"], "privileges": ["read"] },
+        { "names": ["vigil-learnings", "vigil-runbooks"], "privileges": ["read", "write", "create_index"] }
+      ]
+    }
+  }
+}

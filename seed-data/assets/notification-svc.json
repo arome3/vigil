@@ -1,0 +1,17 @@
+{
+  "asset_id": "srv-notification-01",
+  "name": "notification-svc",
+  "type": "microservice",
+  "criticality": "tier-3",
+  "environment": "production",
+  "owner_team": "platform-team",
+  "owner_email": "platform-team@example.com",
+  "data_classification": "internal",
+  "compliance_tags": [],
+  "service_dependencies": [],
+  "k8s_namespace": "vigil-demo",
+  "k8s_deployment": "notification-svc",
+  "github_repo": "vigil-demo/notification-svc",
+  "ip_addresses": ["10.0.1.40"],
+  "last_updated": "2026-02-17T00:00:00.000Z"
+}

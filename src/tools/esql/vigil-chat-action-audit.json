@@ -1,0 +1,17 @@
+{
+  "id": "vigil-chat-action-audit",
+  "type": "esql",
+  "description": "List all remediation actions taken during an incident. Shows what was done, which Elastic Workflow executed it, and the result. Useful for answering 'what did Vigil do to fix this?' or 'show me the audit trail'.",
+  "tags": ["vigil", "chat"],
+  "agent": "vigil-chat",
+  "configuration": {
+    "query": "FROM vigil-actions-* | WHERE incident_id == ?incident_id | SORT @timestamp ASC | KEEP @timestamp, action_type, action_detail, workflow_name, agent_name, status, target_service, target_ip, result_summary",
+    "params": {
+      "incident_id": {
+        "type": "keyword",
+        "required": true,
+        "description": "The incident ID to query"
+      }
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "vigil-chat-incident-list",
+  "type": "esql",
+  "description": "List recent incidents with their status, severity, and resolution time. Useful for answering 'what's happened today?' or 'show me active incidents'.",
+  "tags": ["vigil", "chat"],
+  "agent": "vigil-chat",
+  "configuration": {
+    "query": "FROM vigil-incidents | WHERE created_at > NOW() - ?window | WHERE status == ?status OR ?status == \"\" | SORT created_at DESC | LIMIT 20 | KEEP incident_id, status, severity, incident_type, created_at, total_duration_seconds, reflection_count, resolution_type",
+    "params": {
+      "status": {
+        "type": "keyword",
+        "required": false,
+        "default": "",
+        "description": "Filter by status (e.g., 'resolved', 'investigating', 'executing'). If omitted, returns all."
+      },
+      "window": {
+        "type": "keyword",
+        "required": false,
+        "default": "24h",
+        "description": "Lookback window (e.g. 24h, 7d, 30d). Recommended maximum: 30d. Default: 24h."
+      }
+    }
+  }
+}

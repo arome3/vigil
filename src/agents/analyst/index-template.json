@@ -1,0 +1,44 @@
+{
+  "index_patterns": ["vigil-learnings"],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "index.lifecycle.name": "vigil-1y-policy"
+    },
+    "mappings": {
+      "properties": {
+        "@timestamp":           { "type": "date" },
+        "learning_id":          { "type": "keyword" },
+        "learning_type": {
+          "type": "keyword",
+          "doc_values": true
+        },
+        "incident_ids":         { "type": "keyword" },
+        "analysis_window": {
+          "properties": {
+            "start":            { "type": "date" },
+            "end":              { "type": "date" },
+            "incident_count":   { "type": "integer" }
+          }
+        },
+        "summary":              { "type": "text", "analyzer": "standard" },
+        "summary_vector": {
+          "type": "dense_vector",
+          "dims": 1024,
+          "similarity": "cosine",
+          "index": true
+        },
+        "confidence":           { "type": "float" },
+        "data":                 { "type": "flattened" },
+        "applied":              { "type": "boolean" },
+        "applied_at":           { "type": "date" },
+        "reviewed_by":          { "type": "keyword" },
+        "review_status": {
+          "type": "keyword"
+        }
+      }
+    }
+  }
+}

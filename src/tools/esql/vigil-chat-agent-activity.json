@@ -1,0 +1,23 @@
+{
+  "id": "vigil-chat-agent-activity",
+  "type": "esql",
+  "description": "Show the activity log for a specific agent during an incident. Returns tool calls, findings, and timing. If no agent is specified, returns all agent activity for the incident.",
+  "tags": ["vigil", "chat"],
+  "agent": "vigil-chat",
+  "configuration": {
+    "query": "FROM vigil-agent-telemetry | WHERE incident_id == ?incident_id | WHERE agent_name == ?agent_name OR ?agent_name == \"\" | SORT @timestamp ASC | KEEP @timestamp, agent_name, action_type, tool_name, result_summary, duration_ms",
+    "params": {
+      "incident_id": {
+        "type": "keyword",
+        "required": true,
+        "description": "The incident ID to query"
+      },
+      "agent_name": {
+        "type": "keyword",
+        "required": false,
+        "default": "",
+        "description": "Filter to a specific agent (e.g., 'vigil-investigator'). If omitted, returns all agents."
+      }
+    }
+  }
+}

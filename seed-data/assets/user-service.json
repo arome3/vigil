@@ -1,0 +1,17 @@
+{
+  "asset_id": "srv-user-01",
+  "name": "user-service",
+  "type": "microservice",
+  "criticality": "tier-1",
+  "environment": "production",
+  "owner_team": "auth-team",
+  "owner_email": "auth-team@example.com",
+  "data_classification": "gdpr",
+  "compliance_tags": ["gdpr", "hipaa"],
+  "service_dependencies": ["notification-svc"],
+  "k8s_namespace": "vigil-demo",
+  "k8s_deployment": "user-service",
+  "github_repo": "vigil-demo/user-service",
+  "ip_addresses": ["10.0.1.30"],
+  "last_updated": "2026-02-17T00:00:00.000Z"
+}

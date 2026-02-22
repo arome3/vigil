@@ -1,0 +1,18 @@
+{
+  "id": "vigil-esql-incident-outcomes",
+  "type": "esql",
+  "description": "Aggregates outcome statistics across resolved incidents by incident type. Used by the Analyst for trend analysis and pattern discovery. Window filters by resolved_at (recently concluded incidents).",
+  "tags": ["vigil", "analyst"],
+  "agent": "vigil-analyst",
+  "configuration": {
+    "query": "FROM vigil-incidents | WHERE status IN (\"resolved\", \"escalated\", \"suppressed\") AND resolved_at > NOW() - ?window | STATS total_incidents = COUNT(*), resolved_count = COUNT_IF(status == \"resolved\"), escalated_count = COUNT_IF(status == \"escalated\"), suppressed_count = COUNT_IF(status == \"suppressed\"), avg_reflection_loops = AVG(reflection_count), avg_ttr_seconds = AVG(DATE_DIFF(\"seconds\", created_at, resolved_at)), first_attempt_success = COUNT_IF(reflection_count == 0 AND status == \"resolved\"), avg_health_score = AVG(verification.health_score) BY incident_type | EVAL first_attempt_rate = CASE(resolved_count > 0, ROUND(first_attempt_success * 100.0 / resolved_count, 1), 0) | SORT total_incidents DESC",
+    "params": {
+      "window": {
+        "type": "keyword",
+        "required": false,
+        "default": "30d",
+        "description": "Lookback window for outcome analysis (e.g. 30d, 7d, 90d)"
+      }
+    }
+  }
+}

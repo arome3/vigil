@@ -7,6 +7,23 @@ const log = createLogger('state-machine');
 
 const MAX_REFLECTION_LOOPS = parsePositiveInt('VIGIL_MAX_REFLECTION_LOOPS', 3);
 
+// Terminal states that trigger asynchronous Analyst analysis
+const TERMINAL_STATES = ['resolved', 'suppressed', 'escalated'];
+
+/**
+ * Fire-and-forget trigger for Analyst post-incident analysis.
+ * Uses setImmediate to defer past the current function's return,
+ * with explicit .catch() to prevent unhandled promise rejections.
+ */
+function triggerAnalyst(incidentId, terminalState, incidentData) {
+  setImmediate(() => {
+    import('./analyst-bridge.js')
+      .then(({ analyzeIncident }) => analyzeIncident(incidentId, terminalState, incidentData))
+      .catch(err => log.error(`[Analyst] Failed for ${incidentId}: ${err.stack || err.message}`));
+  });
+  log.info(`[Analyst] Triggered analysis for ${incidentId} (${terminalState})`);
+}
+
 // --- Error Classes ---
 
 export class InvalidTransitionError extends Error {
@@ -93,10 +110,15 @@ export async function transitionIncident(incidentId, newStatus, metadata = {}) {
       `Reflection limit reached (${doc.reflection_count}/${MAX_REFLECTION_LOOPS}). ` +
       `Auto-escalating incident ${incidentId}.`
     );
-    return transitionIncident(incidentId, 'escalated', {
-      ...metadata,
-      escalation_reason: 'reflection_limit_reached'
-    });
+    try {
+      return await transitionIncident(incidentId, 'escalated', {
+        ...metadata,
+        escalation_reason: 'reflection_limit_reached'
+      });
+    } catch (err) {
+      log.error(`Auto-escalation failed for ${incidentId}: ${err.stack || err.message}`);
+      throw err;
+    }
   }
 
   const now = new Date().toISOString();
@@ -118,25 +140,18 @@ export async function transitionIncident(incidentId, newStatus, metadata = {}) {
     updateFields.reflection_count = (doc.reflection_count || 0) + 1;
   }
 
-  // Terminal state handling
-  if (newStatus === 'resolved') {
+  // Terminal state handling (DRY: resolved, suppressed, escalated)
+  if (TERMINAL_STATES.includes(newStatus)) {
     updateFields.resolved_at = now;
-    updateFields.resolution_type = metadata.resolution_type || 'auto_resolved';
-    updateFields.total_duration_seconds = Math.floor(
+    const resolutionMap = {
+      resolved: metadata.resolution_type || 'auto_resolved',
+      suppressed: 'suppressed',
+      escalated: 'escalated'
+    };
+    updateFields.resolution_type = resolutionMap[newStatus];
+    updateFields.total_duration_seconds = Math.max(0, Math.floor(
       (new Date(now) - new Date(doc.created_at)) / 1000
-    );
-  }
-
-  if (newStatus === 'suppressed') {
-    updateFields.resolved_at = now;
-    updateFields.resolution_type = 'suppressed';
-    updateFields.total_duration_seconds = Math.floor(
-      (new Date(now) - new Date(doc.created_at)) / 1000
-    );
-  }
-
-  if (newStatus === 'escalated') {
-    updateFields.resolution_type = 'escalated';
+    ));
   }
 
   // Persist with optimistic concurrency control
@@ -174,10 +189,17 @@ export async function transitionIncident(incidentId, newStatus, metadata = {}) {
       }
     });
   } catch (auditErr) {
-    log.error(`Failed to write audit record for ${incidentId}: ${auditErr.message}`);
+    log.error(`Failed to write audit record for ${incidentId}: ${auditErr.stack || auditErr.message}`);
   }
+
+  const updatedDoc = { ...doc, ...updateFields };
 
   log.info(`Incident ${incidentId}: ${currentStatus} → ${newStatus}`);
 
-  return { ...doc, ...updateFields };
+  // Trigger Analyst on terminal state transitions (fire-and-forget)
+  if (TERMINAL_STATES.includes(newStatus)) {
+    triggerAnalyst(incidentId, newStatus, updatedDoc);
+  }
+
+  return updatedDoc;
 }

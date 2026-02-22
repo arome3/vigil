@@ -1,0 +1,18 @@
+{
+  "id": "vigil-esql-remediation-effectiveness",
+  "type": "esql",
+  "description": "Analyzes which remediation action types succeed or fail across incidents. Used by the Analyst to assess remediation patterns.",
+  "tags": ["vigil", "analyst"],
+  "agent": "vigil-analyst",
+  "configuration": {
+    "query": "FROM vigil-actions-* | WHERE @timestamp > NOW() - ?window AND action_category == \"remediation\" | STATS total_executions = COUNT(*), successes = COUNT_IF(status == \"success\"), failures = COUNT_IF(status == \"failed\"), avg_execution_ms = AVG(execution_time_ms), retries_used = SUM(retry_count) BY action_type, target_system | EVAL success_rate = ROUND(successes * 100.0 / total_executions, 1), avg_execution_seconds = ROUND(avg_execution_ms / 1000.0, 2) | SORT success_rate ASC",
+    "params": {
+      "window": {
+        "type": "keyword",
+        "required": false,
+        "default": "30d",
+        "description": "Lookback window for effectiveness analysis (e.g. 30d, 90d)"
+      }
+    }
+  }
+}

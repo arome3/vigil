@@ -39,3 +39,22 @@ export function parsePositiveInt(envVar, defaultVal) {
   }
   return parsed;
 }
+
+/**
+ * Parse an environment variable as a positive float (> 0).
+ * Returns the default on missing, empty, non-numeric, or non-positive values.
+ *
+ * @param {string} envVar  - Environment variable name
+ * @param {number} defaultVal - Default value (must be > 0)
+ * @returns {number}
+ */
+export function parsePositiveFloat(envVar, defaultVal) {
+  const raw = process.env[envVar];
+  if (raw === undefined || raw === '') return defaultVal;
+  const parsed = parseFloat(raw);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    log.warn(`Invalid ${envVar}='${raw}' (must be positive float). Using default ${defaultVal}.`);
+    return defaultVal;
+  }
+  return parsed;
+}

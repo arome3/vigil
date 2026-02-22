@@ -1,0 +1,18 @@
+{
+  "id": "vigil-chat-incident-lookup",
+  "type": "esql",
+  "description": "Look up a specific incident by ID, or get the most recent incident. Returns full incident details including status, severity, agents involved, investigation findings, remediation actions, and verification results.",
+  "tags": ["vigil", "chat"],
+  "agent": "vigil-chat",
+  "configuration": {
+    "query": "FROM vigil-incidents | WHERE incident_id == ?incident_id OR ?incident_id == \"\" | SORT created_at DESC | LIMIT 1 | KEEP incident_id, status, severity, incident_type, created_at, resolved_at, priority_score, agents_involved, reflection_count, resolution_type, total_duration_seconds, investigation, remediation_plan, verification_results, alert_ids, affected_assets",
+    "params": {
+      "incident_id": {
+        "type": "keyword",
+        "required": false,
+        "default": "",
+        "description": "The incident ID (e.g., INC-2026-00142). If omitted, returns the most recent incident."
+      }
+    }
+  }
+}

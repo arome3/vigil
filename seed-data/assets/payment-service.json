@@ -1,0 +1,17 @@
+{
+  "asset_id": "srv-payment-01",
+  "name": "payment-service",
+  "type": "microservice",
+  "criticality": "tier-1",
+  "environment": "production",
+  "owner_team": "payments-team",
+  "owner_email": "payments-team@example.com",
+  "data_classification": "pci-dss",
+  "compliance_tags": ["pci-dss", "sox"],
+  "service_dependencies": ["user-service", "notification-svc"],
+  "k8s_namespace": "vigil-demo",
+  "k8s_deployment": "payment-service",
+  "github_repo": "vigil-demo/payment-service",
+  "ip_addresses": ["10.0.1.20"],
+  "last_updated": "2026-02-17T00:00:00.000Z"
+}

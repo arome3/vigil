@@ -1,0 +1,18 @@
+{
+  "id": "vigil-chat-triage-stats",
+  "type": "esql",
+  "description": "Show triage performance statistics — how many alerts were suppressed vs investigated, average priority scores, resolution rates. Useful for answering 'how many alerts did Vigil suppress today?' or 'what's the false positive rate?'.",
+  "tags": ["vigil", "chat"],
+  "agent": "vigil-chat",
+  "configuration": {
+    "query": "FROM vigil-incidents | WHERE created_at > NOW() - ?window | STATS total = COUNT(*), suppressed = SUM(CASE(status == \"suppressed\", 1, 0)), investigated = SUM(CASE(status != \"suppressed\", 1, 0)), avg_priority = AVG(priority_score), resolved = SUM(CASE(status == \"resolved\", 1, 0)), escalated = SUM(CASE(status == \"escalated\", 1, 0)), avg_resolution_seconds = AVG(total_duration_seconds)",
+    "params": {
+      "window": {
+        "type": "keyword",
+        "required": false,
+        "default": "24h",
+        "description": "Lookback window (e.g. 24h, 7d, 30d). Recommended maximum: 30d. Default: 24h."
+      }
+    }
+  }
+}

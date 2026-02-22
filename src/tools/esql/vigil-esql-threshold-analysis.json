@@ -1,0 +1,18 @@
+{
+  "id": "vigil-esql-threshold-analysis",
+  "type": "esql",
+  "description": "Analyzes per-service anomaly detection accuracy by comparing Sentinel alerts against incident outcomes. Used by the Analyst to tune detection thresholds.",
+  "tags": ["vigil", "analyst"],
+  "agent": "vigil-analyst",
+  "configuration": {
+    "query": "FROM vigil-incidents | WHERE incident_type == \"operational\" AND created_at > NOW() - ?window | EVAL was_real = status == \"resolved\" AND reflection_count <= 1, was_false_alarm = status == \"suppressed\", detection_source = COALESCE(detection.source_agent, \"unknown\") | WHERE detection_source == \"vigil-sentinel\" | STATS total_detections = COUNT(*), true_positives = COUNT_IF(was_real), false_positives = COUNT_IF(was_false_alarm), avg_deviation = AVG(detection.anomaly_deviation) BY affected_service | EVAL precision = ROUND(true_positives * 100.0 / total_detections, 1), fp_rate = ROUND(false_positives * 100.0 / total_detections, 1), recommended_threshold = CASE(fp_rate > 40.0, ROUND(avg_deviation * 1.15, 2), true_positives == 0 AND total_detections > 5, ROUND(avg_deviation * 0.85, 2), avg_deviation) | SORT fp_rate DESC",
+    "params": {
+      "window": {
+        "type": "keyword",
+        "required": false,
+        "default": "14d",
+        "description": "Lookback window for threshold analysis (e.g. 14d, 30d)"
+      }
+    }
+  }
+}

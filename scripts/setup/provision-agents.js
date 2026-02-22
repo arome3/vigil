@@ -242,6 +242,41 @@ The Verifier agent will also call your health monitor tool directly when checkin
 
 Wait 60 seconds after Executor reports completion before running health checks to allow metrics to stabilize.`,
     tools: ['vigil-esql-health-comparison', 'vigil-search-baselines']
+  },
+  {
+    name: 'vigil-analyst',
+    description: 'Asynchronous learning engine — calibrates weights, generates runbooks, tunes thresholds, discovers patterns, writes retrospectives',
+    model: 'claude-sonnet-4-5-20250929',
+    system_prompt: `You are vigil-analyst, the learning and continuous improvement agent for the Vigil autonomous SOC platform. You activate AFTER incidents reach a terminal state. Your job is to make Vigil smarter over time by analyzing outcomes, identifying patterns, and writing calibration data back into the system.`,
+    tools: ['vigil-esql-incident-outcomes', 'vigil-esql-triage-calibration', 'vigil-esql-threshold-analysis', 'vigil-esql-remediation-effectiveness', 'vigil-search-incident-patterns'],
+    a2a_connections: []
+  },
+  {
+    name: 'vigil-chat',
+    description: 'Conversational assistant for Vigil SOC — answers questions about incidents, agent activity, and system health using natural language',
+    model: process.env.LLM_MODEL || 'claude-sonnet-4-5-20250929',
+    system_prompt: `You are Vigil Chat, the conversational interface for the Vigil autonomous SOC platform. You help security analysts, engineers, and stakeholders understand what Vigil's 9 autonomous agents have done, are doing, and plan to do.
+
+You have access to all Vigil Elasticsearch indices. Use your tools to answer questions with real data — never guess or fabricate.
+
+Response style:
+- Be concise and direct. Lead with the answer, then provide supporting detail.
+- Use bullet points for lists of actions or findings.
+- Include specific values (timestamps, scores, IPs, commit hashes) when available.
+- When describing agent activity, name the specific agent and tool that produced each finding.
+- Format severity and status with visual indicators: CRITICAL, HIGH, MEDIUM, LOW.
+- If an incident is still in progress, say which agent is currently active and what state the incident is in.
+
+You are read-only. You cannot modify incidents, trigger agents, or execute workflows. If asked to take action, explain that you are an observer and direct the user to the autonomous pipeline or the Coordinator agent.`,
+    tools: [
+      'vigil-chat-incident-lookup',
+      'vigil-chat-incident-list',
+      'vigil-chat-agent-activity',
+      'vigil-chat-service-health',
+      'vigil-chat-action-audit',
+      'vigil-chat-triage-stats'
+    ],
+    a2a_connections: []
   }
 ];
 
@@ -254,6 +289,8 @@ const apiKeyRoleDescriptors = {
   'vigil-commander':     { vigil_commander: { indices: [{ names: ['vigil-runbooks', 'vigil-assets', 'vigil-incidents'], privileges: ['read'] }] } },
   'vigil-executor':      { vigil_executor: { indices: [{ names: ['vigil-actions-*', 'vigil-incidents'], privileges: ['read', 'write'] }] } },
   'vigil-verifier':      { vigil_verifier: { indices: [{ names: ['vigil-baselines', 'vigil-incidents', 'vigil-actions-*'], privileges: ['read', 'write'] }] } },
+  'vigil-analyst':       { vigil_analyst: { indices: [{ names: ['vigil-incidents', 'vigil-actions-*', 'vigil-baselines', 'vigil-runbooks', 'vigil-agent-telemetry'], privileges: ['read'] }, { names: ['vigil-learnings', 'vigil-runbooks'], privileges: ['read', 'write', 'create_index'] }] } },
+  'vigil-chat':          { vigil_chat: { indices: [{ names: ['vigil-incidents', 'vigil-agent-telemetry', 'vigil-actions-*', 'metrics-apm-*', 'metrics-system-*'], privileges: ['read'] }] } },
 };
 
 // --- Coordinator Custom Tools ---

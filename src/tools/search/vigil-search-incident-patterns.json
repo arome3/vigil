@@ -1,0 +1,34 @@
+{
+  "name": "vigil-search-incident-patterns",
+  "type": "search",
+  "description": "Searches resolved incidents by behavioral similarity to discover recurring multi-step attack patterns.",
+  "tags": ["vigil", "analyst"],
+  "agent": "vigil-analyst",
+  "index": "vigil-incidents",
+  "retrieval_strategy": "hybrid",
+  "text_field": "investigation_summary",
+  "vector_field": "investigation_summary_vector",
+  "filter": {
+    "bool": {
+      "must": [
+        { "terms": { "status": ["resolved", "escalated"] } },
+        { "term": { "incident_type": "security" } }
+      ]
+    }
+  },
+  "result_fields": [
+    "incident_id",
+    "incident_type",
+    "severity",
+    "root_cause",
+    "attack_chain",
+    "mitre_techniques",
+    "affected_service",
+    "remediation_plan.actions",
+    "investigation_summary",
+    "created_at",
+    "resolved_at",
+    "reflection_count"
+  ],
+  "max_results": 50
+}

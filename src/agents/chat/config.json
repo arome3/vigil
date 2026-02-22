@@ -1,0 +1,36 @@
+{
+  "name": "vigil-chat",
+  "description": "Conversational assistant for Vigil SOC — answers questions about incidents, agent activity, and system health using natural language",
+  "model": "claude-sonnet-4-5-20250929",
+  "system_prompt_file": "system-prompt.md",
+  "tools": [
+    "vigil-chat-incident-lookup",
+    "vigil-chat-incident-list",
+    "vigil-chat-agent-activity",
+    "vigil-chat-service-health",
+    "vigil-chat-action-audit",
+    "vigil-chat-triage-stats"
+  ],
+  "a2a_connections": [],
+  "config": {
+    "llm_temperature": 0.3
+  },
+  "api_key_role_descriptors": {
+    "vigil_chat": {
+      "indices": [
+        {
+          "names": [
+            "vigil-incidents",
+            "vigil-agent-telemetry",
+            "vigil-actions-*",
+            "metrics-apm-*",
+            "metrics-system-*"
+          ],
+          "privileges": [
+            "read"
+          ]
+        }
+      ]
+    }
+  }
+}

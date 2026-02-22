@@ -1,0 +1,18 @@
+{
+  "id": "vigil-esql-triage-calibration",
+  "type": "esql",
+  "description": "Compares triage priority scores against actual incident outcomes to compute scoring accuracy. Used by the Analyst to calibrate triage weights. Window filters by created_at (recently created incidents).",
+  "tags": ["vigil", "analyst"],
+  "agent": "vigil-analyst",
+  "configuration": {
+    "query": "FROM vigil-incidents | WHERE status IN (\"resolved\", \"escalated\", \"suppressed\") AND created_at > NOW() - ?window | EVAL predicted_severity = CASE(priority_score >= 0.7, \"high\", priority_score >= 0.4, \"medium\", \"low\"), actual_severity = CASE(status == \"escalated\", \"high\", status == \"resolved\" AND reflection_count > 0, \"medium\", status == \"resolved\" AND reflection_count == 0, CASE(verification.health_score >= 0.95, \"low\", \"medium\"), status == \"suppressed\", \"low\"), prediction_correct = predicted_severity == actual_severity, false_negative = predicted_severity == \"low\" AND actual_severity == \"high\", false_positive = predicted_severity == \"high\" AND actual_severity == \"low\" | STATS total = COUNT(*), correct = COUNT_IF(prediction_correct), fn_count = COUNT_IF(false_negative), fp_count = COUNT_IF(false_positive), tp_count = COUNT_IF(predicted_severity == \"high\" AND actual_severity == \"high\"), fp_count_binary = COUNT_IF(predicted_severity == \"high\" AND actual_severity != \"high\"), fn_count_binary = COUNT_IF(predicted_severity != \"high\" AND actual_severity == \"high\"), tn_count = COUNT_IF(predicted_severity != \"high\" AND actual_severity != \"high\"), avg_score_resolved = AVG(CASE(status == \"resolved\", priority_score, NULL)), avg_score_escalated = AVG(CASE(status == \"escalated\", priority_score, NULL)), avg_score_suppressed = AVG(CASE(status == \"suppressed\", priority_score, NULL)) | EVAL accuracy = ROUND(correct * 100.0 / total, 1), fn_rate = ROUND(fn_count * 100.0 / total, 1), fp_rate = ROUND(fp_count * 100.0 / total, 1)",
+    "params": {
+      "window": {
+        "type": "keyword",
+        "required": false,
+        "default": "30d",
+        "description": "Lookback window for calibration analysis (e.g. 30d, 14d)"
+      }
+    }
+  }
+}
