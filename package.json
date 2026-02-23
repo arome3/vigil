@@ -10,8 +10,11 @@
     "bootstrap": "bash scripts/bootstrap.sh",
     "dev": "node src/webhooks/github-receiver.js",
     "test": "node --test tests/**/*.js",
-    "demo:scenario1": "node scripts/demo/scenario-compromised-key.js",
-    "demo:scenario2": "node scripts/demo/scenario-bad-deploy.js"
+    "demo:scenario1": "node scripts/demo/scenario-1-compromised-key.js",
+    "demo:scenario2": "node scripts/demo/scenario-2-bad-deployment.js",
+    "demo:all": "node scripts/demo/run-all.js",
+    "dev:ui": "npm --prefix ui run dev -- -p 3001",
+    "build:ui": "npm --prefix ui run build"
   },
   "dependencies": {
     "@elastic/elasticsearch": "^8.17.0",

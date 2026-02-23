@@ -1,0 +1,272 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ─── Vigil Design Tokens ─────────────────────────────────── */
+
+@theme inline {
+  /* shadcn/ui core tokens */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Fonts */
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+
+  /* Radius */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+
+  /* ─── Vigil Severity Colors ─────────────────────────── */
+  --color-severity-critical: #EF4444;
+  --color-severity-critical-bg: #7F1D1D;
+  --color-severity-high: #F97316;
+  --color-severity-high-bg: #7C2D12;
+  --color-severity-medium: #F59E0B;
+  --color-severity-medium-bg: #78350F;
+  --color-severity-low: #3B82F6;
+  --color-severity-low-bg: #1E3A5F;
+  --color-severity-info: #06B6D4;
+  --color-severity-info-bg: #164E63;
+
+  /* ─── Vigil State Machine Colors ────────────────────── */
+  --color-state-detected: #94A3B8;
+  --color-state-triaged: #A78BFA;
+  --color-state-investigating: #3B82F6;
+  --color-state-threat-hunting: #8B5CF6;
+  --color-state-planning: #F59E0B;
+  --color-state-awaiting-approval: #FB923C;
+  --color-state-executing: #FBBF24;
+  --color-state-verifying: #2DD4BF;
+  --color-state-reflecting: #C084FC;
+  --color-state-resolved: #22C55E;
+  --color-state-escalated: #EF4444;
+  --color-state-suppressed: #64748B;
+
+  /* ─── Vigil Agent Colors ────────────────────────────── */
+  --color-agent-coordinator: #A78BFA;
+  --color-agent-triage: #FB923C;
+  --color-agent-investigator: #3B82F6;
+  --color-agent-threat-hunter: #8B5CF6;
+  --color-agent-sentinel: #06B6D4;
+  --color-agent-commander: #F59E0B;
+  --color-agent-executor: #FBBF24;
+  --color-agent-verifier: #22C55E;
+  --color-agent-analyst: #EC4899;
+  --color-agent-reporter: #F472B6;
+  --color-agent-chat: #818CF8;
+
+  /* ─── Vigil Semantic Colors ─────────────────────────── */
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-info: #3B82F6;
+
+  /* ─── Vigil Surface Colors ──────────────────────────── */
+  --color-surface-base: var(--vigil-surface-base);
+  --color-surface-raised: var(--vigil-surface-raised);
+  --color-surface-overlay: var(--vigil-surface-overlay);
+  --color-surface-sunken: var(--vigil-surface-sunken);
+  --color-text-primary: var(--vigil-text-primary);
+  --color-text-secondary: var(--vigil-text-secondary);
+  --color-text-disabled: var(--vigil-text-disabled);
+  --color-border-subtle: var(--vigil-border-subtle);
+  --color-border-strong: var(--vigil-border-strong);
+}
+
+/* ─── Dark Mode (Default) ─────────────────────────────────── */
+:root {
+  --radius: 0.5rem;
+
+  /* shadcn/ui dark theme mapped to Vigil's slate palette */
+  --background: #0F172A;
+  --foreground: #F1F5F9;
+  --card: #1E293B;
+  --card-foreground: #F1F5F9;
+  --popover: #334155;
+  --popover-foreground: #F1F5F9;
+  --primary: #F1F5F9;
+  --primary-foreground: #0F172A;
+  --secondary: #1E293B;
+  --secondary-foreground: #F1F5F9;
+  --muted: #1E293B;
+  --muted-foreground: #94A3B8;
+  --accent: #1E293B;
+  --accent-foreground: #F1F5F9;
+  --destructive: #EF4444;
+  --border: #334155;
+  --input: #334155;
+  --ring: #3B82F6;
+  --chart-1: #3B82F6;
+  --chart-2: #22C55E;
+  --chart-3: #F59E0B;
+  --chart-4: #EF4444;
+  --chart-5: #8B5CF6;
+
+  /* Vigil surfaces */
+  --vigil-surface-base: #0F172A;
+  --vigil-surface-raised: #1E293B;
+  --vigil-surface-overlay: #334155;
+  --vigil-surface-sunken: #0B1120;
+  --vigil-text-primary: #F1F5F9;
+  --vigil-text-secondary: #CBD5E1;
+  --vigil-text-disabled: #64748B;
+  --vigil-border-subtle: #334155;
+  --vigil-border-strong: #475569;
+}
+
+/* ─── Light Mode ──────────────────────────────────────────── */
+:root:not(.dark) {
+  --background: #FFFFFF;
+  --foreground: #0F172A;
+  --card: #F8FAFC;
+  --card-foreground: #0F172A;
+  --popover: #F1F5F9;
+  --popover-foreground: #0F172A;
+  --primary: #0F172A;
+  --primary-foreground: #F1F5F9;
+  --secondary: #F1F5F9;
+  --secondary-foreground: #0F172A;
+  --muted: #F1F5F9;
+  --muted-foreground: #64748B;
+  --accent: #F1F5F9;
+  --accent-foreground: #0F172A;
+  --destructive: #EF4444;
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #3B82F6;
+
+  --vigil-surface-base: #FFFFFF;
+  --vigil-surface-raised: #F8FAFC;
+  --vigil-surface-overlay: #F1F5F9;
+  --vigil-surface-sunken: #E2E8F0;
+  --vigil-text-primary: #0F172A;
+  --vigil-text-secondary: #475569;
+  --vigil-text-disabled: #94A3B8;
+  --vigil-border-subtle: #E2E8F0;
+  --vigil-border-strong: #CBD5E1;
+}
+
+/* ─── Base Styles ─────────────────────────────────────────── */
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "zero";
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Global focus ring */
+  *:focus-visible {
+    outline: 2px solid var(--color-info);
+    outline-offset: 2px;
+  }
+
+  /* Subtle noise texture for depth */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.015;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 200px 200px;
+  }
+}
+
+/* ─── Monospace data styling ──────────────────────────────── */
+.mono-data {
+  font-family: var(--font-mono);
+  font-feature-settings: "zero";
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Scrollbar styling ───────────────────────────────────── */
+@layer base {
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--vigil-border-subtle);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--vigil-border-strong);
+  }
+}
+
+/* ─── New incident highlight animation ────────────────────── */
+@keyframes incident-highlight {
+  0% { background-color: rgba(251, 191, 36, 0.2); }
+  100% { background-color: transparent; }
+}
+.animate-incident-highlight {
+  animation: incident-highlight 2s ease-out forwards;
+}
+
+/* ─── Pulse ring for status changes ───────────────────────── */
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 currentColor; opacity: 0.4; }
+  100% { box-shadow: 0 0 0 8px currentColor; opacity: 0; }
+}
+.animate-pulse-ring {
+  animation: pulse-ring 0.6s ease-out;
+}
+
+/* ─── Connection status pulse ─────────────────────────────── */
+@keyframes connection-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.animate-connection-pulse {
+  animation: connection-pulse 1s ease-in-out infinite;
+}
+
+/* ─── Reduced Motion ──────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
