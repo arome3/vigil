@@ -9,7 +9,9 @@
     "vigil-chat-agent-activity",
     "vigil-chat-service-health",
     "vigil-chat-action-audit",
-    "vigil-chat-triage-stats"
+    "vigil-chat-triage-stats",
+    "vigil-report-executive-summary",
+    "vigil-report-incident-detail-export"
   ],
   "a2a_connections": [],
   "config": {

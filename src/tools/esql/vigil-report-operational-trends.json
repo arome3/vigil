@@ -1,0 +1,22 @@
+{
+  "id": "vigil-report-operational-trends",
+  "type": "esql",
+  "description": "Aggregates per-service operational incident metrics including incident count, average time to remediate, average reflection loops, and escalation count for operational trend reporting.",
+  "tags": ["vigil", "reporter"],
+  "agent": "vigil-reporter",
+  "configuration": {
+    "query": "FROM vigil-incidents | WHERE created_at >= ?window_start AND created_at <= ?window_end AND incident_type == \"operational\" | STATS incident_count = COUNT(*), avg_ttr = AVG(ttr_seconds), avg_reflections = AVG(reflection_count), escalated = COUNT_IF(status == \"escalated\") BY affected_service | SORT incident_count DESC",
+    "params": {
+      "window_start": {
+        "type": "date",
+        "required": true,
+        "description": "Start of reporting window (ISO 8601)"
+      },
+      "window_end": {
+        "type": "date",
+        "required": true,
+        "description": "End of reporting window (ISO 8601)"
+      }
+    }
+  }
+}

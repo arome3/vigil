@@ -1,0 +1,22 @@
+{
+  "id": "vigil-report-agent-performance",
+  "type": "esql",
+  "description": "Aggregates per-agent execution metrics from telemetry data including invocation counts, execution time statistics (avg, p95, p99), tool call counts, success/failure rates for agent performance reporting.",
+  "tags": ["vigil", "reporter"],
+  "agent": "vigil-reporter",
+  "configuration": {
+    "query": "FROM vigil-agent-telemetry | WHERE @timestamp >= ?window_start AND @timestamp <= ?window_end | STATS total_invocations = COUNT(*), avg_execution_ms = AVG(duration_ms), p95_execution_ms = PERCENTILE(duration_ms, 95), p99_execution_ms = PERCENTILE(duration_ms, 99), total_tool_calls = SUM(tool_call_count), successes = COUNT_IF(outcome == \"success\"), failures = COUNT_IF(outcome == \"failure\") BY agent_name | EVAL success_rate = ROUND(successes * 100.0 / total_invocations, 1), avg_execution_seconds = ROUND(avg_execution_ms / 1000.0, 2) | SORT total_invocations DESC",
+    "params": {
+      "window_start": {
+        "type": "date",
+        "required": true,
+        "description": "Start of reporting window (ISO 8601)"
+      },
+      "window_end": {
+        "type": "date",
+        "required": true,
+        "description": "End of reporting window (ISO 8601)"
+      }
+    }
+  }
+}

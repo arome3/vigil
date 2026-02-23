@@ -1,0 +1,68 @@
+{
+  "index_patterns": ["vigil-reports"],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "index.lifecycle.name": "vigil-1y-policy"
+    },
+    "mappings": {
+      "properties": {
+        "@timestamp":           { "type": "date" },
+        "report_id":            { "type": "keyword" },
+        "report_type": {
+          "type": "keyword",
+          "doc_values": true
+        },
+        "report_title":         { "type": "text", "analyzer": "standard" },
+        "reporting_window": {
+          "properties": {
+            "start":            { "type": "date" },
+            "end":              { "type": "date" }
+          }
+        },
+        "generated_at":         { "type": "date" },
+        "generated_by":         { "type": "keyword" },
+        "trigger_type": {
+          "type": "keyword"
+        },
+        "sections": {
+          "type": "nested",
+          "properties": {
+            "section_id":       { "type": "keyword" },
+            "title":            { "type": "text" },
+            "narrative":        { "type": "text", "analyzer": "standard" },
+            "narrative_vector": {
+              "type": "dense_vector",
+              "dims": 1024,
+              "similarity": "cosine",
+              "index": true
+            },
+            "data":             { "type": "flattened" },
+            "source_query":     { "type": "text", "index": false },
+            "compliance_controls": { "type": "keyword" }
+          }
+        },
+        "metadata": {
+          "properties": {
+            "incident_count":   { "type": "integer" },
+            "data_sources":     { "type": "keyword" },
+            "methodology":      { "type": "text", "index": false },
+            "token_estimate":   { "type": "integer" }
+          }
+        },
+        "delivery": {
+          "properties": {
+            "channels":         { "type": "keyword" },
+            "delivered_at":     { "type": "date" },
+            "delivery_status":  { "type": "keyword" }
+          }
+        },
+        "status": {
+          "type": "keyword"
+        }
+      }
+    }
+  }
+}

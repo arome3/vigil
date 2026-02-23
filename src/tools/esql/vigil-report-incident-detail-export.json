@@ -1,0 +1,17 @@
+{
+  "id": "vigil-report-incident-detail-export",
+  "type": "esql",
+  "description": "Produces a comprehensive single-incident export for post-incident review or compliance submission. Returns the full incident record including status, severity, timing metrics, agent attribution, investigation findings, remediation plan, and verification results.",
+  "tags": ["vigil", "reporter"],
+  "agent": "vigil-reporter",
+  "configuration": {
+    "query": "FROM vigil-incidents | WHERE incident_id == ?incident_id | KEEP incident_id, status, severity, incident_type, priority_score, created_at, resolved_at, total_duration_seconds, ttd_seconds, tti_seconds, ttr_seconds, ttv_seconds, agents_involved, reflection_count, resolution_type, alert_ids, affected_assets, investigation, remediation_plan, verification_results",
+    "params": {
+      "incident_id": {
+        "type": "keyword",
+        "required": true,
+        "description": "The incident ID to export"
+      }
+    }
+  }
+}

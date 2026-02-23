@@ -1,0 +1,84 @@
+name: vigil-wf-report-delivery
+description: Deliver generated report to configured channels
+triggers:
+  - type: api
+    enabled: true
+steps:
+  - id: slack_delivery
+    type: webhook
+    condition: "'slack' IN {{params.channels}}"
+    url: "{{secrets.slack_webhook}}"
+    method: POST
+    body:
+      blocks:
+        - type: header
+          text:
+            type: plain_text
+            text: "{{params.report_title}}"
+        - type: section
+          text:
+            type: mrkdwn
+            text: "{{params.executive_brief}}"
+        - type: section
+          fields:
+            - type: mrkdwn
+              text: "*Incidents:* {{params.incident_count}}"
+            - type: mrkdwn
+              text: "*Avg MTTR:* {{params.avg_mttr}}"
+            - type: mrkdwn
+              text: "*Autonomous Rate:* {{params.autonomous_rate}}%"
+            - type: mrkdwn
+              text: "*Period:* {{params.window_start}} to {{params.window_end}}"
+        - type: actions
+          elements:
+            - type: button
+              text:
+                type: plain_text
+                text: "View Full Report"
+              url: "{{params.kibana_report_url}}"
+
+  - id: email_delivery
+    type: webhook
+    condition: "'email' IN {{params.channels}}"
+    url: "{{secrets.email_api_url}}"
+    method: POST
+    headers:
+      Authorization: "Bearer {{secrets.email_api_key}}"
+    body:
+      to: "{{params.email_recipients}}"
+      subject: "[Vigil] {{params.report_title}}"
+      html: "{{params.report_html}}"
+
+  - id: jira_delivery
+    type: webhook
+    condition: "'jira' IN {{params.channels}}"
+    url: "https://{{secrets.jira_host}}/rest/api/3/issue"
+    method: POST
+    headers:
+      Authorization: "Basic {{secrets.jira_auth}}"
+      Content-Type: application/json
+    body:
+      fields:
+        project:
+          key: "{{params.jira_project}}"
+        summary: "{{params.report_title}}"
+        description:
+          type: doc
+          version: 1
+          content:
+            - type: paragraph
+              content:
+                - type: text
+                  text: "{{params.executive_brief}}"
+        issuetype:
+          name: "Task"
+        labels: ["vigil-report", "compliance"]
+
+  - id: log_delivery
+    type: index
+    index: vigil-reports
+    document:
+      report_id: "{{params.report_id}}"
+      delivery.channels: "{{params.channels}}"
+      delivery.delivered_at: "{{now}}"
+      delivery.delivery_status: "delivered"

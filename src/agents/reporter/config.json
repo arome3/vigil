@@ -1,0 +1,44 @@
+{
+  "name": "vigil-reporter",
+  "description": "Scheduled reporting agent that generates executive summaries, compliance documentation, and operational trend reports from Vigil incident data.",
+  "model": "claude-sonnet-4-5-20250929",
+  "system_prompt_file": "system-prompt.md",
+  "tools": [
+    "vigil-report-executive-summary",
+    "vigil-report-compliance-evidence",
+    "vigil-report-operational-trends",
+    "vigil-report-agent-performance",
+    "vigil-report-incident-detail-export",
+    "vigil-search-incidents-for-report"
+  ],
+  "a2a_connections": [],
+  "config": {
+    "llm_temperature": 0.2
+  },
+  "trigger": "scheduled",
+  "execution_mode": "asynchronous",
+  "api_key_role_descriptors": {
+    "vigil_reporter": {
+      "indices": [
+        {
+          "names": [
+            "vigil-incidents",
+            "vigil-actions-*",
+            "vigil-learnings",
+            "vigil-agent-telemetry",
+            "vigil-investigations",
+            "vigil-runbooks",
+            "vigil-baselines",
+            "metrics-apm-*",
+            "metrics-system-*"
+          ],
+          "privileges": ["read"]
+        },
+        {
+          "names": ["vigil-reports"],
+          "privileges": ["read", "write", "create_index"]
+        }
+      ]
+    }
+  }
+}

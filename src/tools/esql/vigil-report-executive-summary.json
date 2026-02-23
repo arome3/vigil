@@ -1,0 +1,22 @@
+{
+  "id": "vigil-report-executive-summary",
+  "type": "esql",
+  "description": "Aggregates high-level incident metrics for executive reporting: total incidents by severity and type, mean time metrics (MTTD, MTTI, MTTR, MTTV), autonomous resolution rate, suppression rate, and reflection loop statistics.",
+  "tags": ["vigil", "reporter"],
+  "agent": "vigil-reporter",
+  "configuration": {
+    "query": "FROM vigil-incidents | WHERE created_at >= ?window_start AND created_at <= ?window_end | STATS total_incidents = COUNT(*), security_incidents = COUNT_IF(incident_type == \"security\"), operational_incidents = COUNT_IF(incident_type == \"operational\"), critical_count = COUNT_IF(severity == \"critical\"), high_count = COUNT_IF(severity == \"high\"), medium_count = COUNT_IF(severity == \"medium\"), low_count = COUNT_IF(severity == \"low\"), resolved_count = COUNT_IF(status == \"resolved\"), escalated_count = COUNT_IF(status == \"escalated\"), suppressed_count = COUNT_IF(status == \"suppressed\"), avg_ttd = AVG(ttd_seconds), avg_tti = AVG(tti_seconds), avg_ttr = AVG(ttr_seconds), avg_ttv = AVG(ttv_seconds), avg_total_duration = AVG(total_duration_seconds), total_reflections = SUM(reflection_count), first_attempt_resolutions = COUNT_IF(reflection_count == 0 AND status == \"resolved\") | EVAL autonomous_rate = CASE(total_incidents == 0, 0.0, ROUND(resolved_count * 100.0 / total_incidents, 1)), suppression_rate = CASE(total_incidents == 0, 0.0, ROUND(suppressed_count * 100.0 / total_incidents, 1)), first_attempt_rate = CASE(resolved_count == 0, 0.0, ROUND(first_attempt_resolutions * 100.0 / resolved_count, 1)), avg_ttd_display = ROUND(avg_ttd, 0), avg_tti_display = ROUND(avg_tti, 0), avg_ttr_display = ROUND(avg_ttr, 0), avg_total_display = ROUND(avg_total_duration, 0)",
+    "params": {
+      "window_start": {
+        "type": "date",
+        "required": true,
+        "description": "Start of the reporting window (ISO 8601)"
+      },
+      "window_end": {
+        "type": "date",
+        "required": true,
+        "description": "End of the reporting window (ISO 8601)"
+      }
+    }
+  }
+}

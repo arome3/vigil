@@ -252,6 +252,23 @@ Wait 60 seconds after Executor reports completion before running health checks t
     a2a_connections: []
   },
   {
+    name: 'vigil-reporter',
+    description: 'Scheduled reporting agent that generates executive summaries, compliance documentation, and operational trend reports from Vigil incident data.',
+    model: process.env.LLM_MODEL || 'claude-sonnet-4-5-20250929',
+    system_prompt: `You are vigil-reporter, the reporting and documentation agent for the Vigil autonomous SOC platform. You generate structured reports from Vigil's operational data. You run on a schedule (daily, weekly, monthly) and can be triggered on demand. You are NEVER on the critical path of active incident response. Your job is to package Vigil's indexed intelligence into consumable documents for executives, auditors, and engineering leadership.
+
+You NEVER modify operational indices. You only READ from vigil-incidents, vigil-actions-*, vigil-learnings, vigil-agent-telemetry, vigil-baselines, vigil-runbooks and WRITE to vigil-reports. Every data point in a report must be traceable to a specific ES|QL query or search operation. Narratives must be factual and grounded in the queried data.`,
+    tools: [
+      'vigil-report-executive-summary',
+      'vigil-report-compliance-evidence',
+      'vigil-report-operational-trends',
+      'vigil-report-agent-performance',
+      'vigil-report-incident-detail-export',
+      'vigil-search-incidents-for-report'
+    ],
+    a2a_connections: []
+  },
+  {
     name: 'vigil-chat',
     description: 'Conversational assistant for Vigil SOC — answers questions about incidents, agent activity, and system health using natural language',
     model: process.env.LLM_MODEL || 'claude-sonnet-4-5-20250929',
@@ -290,6 +307,7 @@ const apiKeyRoleDescriptors = {
   'vigil-executor':      { vigil_executor: { indices: [{ names: ['vigil-actions-*', 'vigil-incidents'], privileges: ['read', 'write'] }] } },
   'vigil-verifier':      { vigil_verifier: { indices: [{ names: ['vigil-baselines', 'vigil-incidents', 'vigil-actions-*'], privileges: ['read', 'write'] }] } },
   'vigil-analyst':       { vigil_analyst: { indices: [{ names: ['vigil-incidents', 'vigil-actions-*', 'vigil-baselines', 'vigil-runbooks', 'vigil-agent-telemetry'], privileges: ['read'] }, { names: ['vigil-learnings', 'vigil-runbooks'], privileges: ['read', 'write', 'create_index'] }] } },
+  'vigil-reporter':      { vigil_reporter: { indices: [{ names: ['vigil-incidents', 'vigil-actions-*', 'vigil-learnings', 'vigil-agent-telemetry', 'vigil-investigations', 'vigil-runbooks', 'vigil-baselines', 'metrics-apm-*', 'metrics-system-*'], privileges: ['read'] }, { names: ['vigil-reports'], privileges: ['read', 'write', 'create_index'] }] } },
   'vigil-chat':          { vigil_chat: { indices: [{ names: ['vigil-incidents', 'vigil-agent-telemetry', 'vigil-actions-*', 'metrics-apm-*', 'metrics-system-*'], privileges: ['read'] }] } },
 };
 

@@ -18,7 +18,8 @@ const standardIndices = [
   'vigil-threat-intel',
   'vigil-baselines',
   'vigil-agent-telemetry',
-  'vigil-alerts-operational'
+  'vigil-alerts-operational',
+  'vigil-reports'
 ];
 
 function isAlreadyExists(err) {

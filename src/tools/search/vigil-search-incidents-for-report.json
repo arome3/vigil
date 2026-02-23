@@ -1,0 +1,33 @@
+{
+  "name": "vigil-search-incidents-for-report",
+  "type": "search",
+  "description": "Searches incidents by semantic similarity for thematic reporting — e.g., 'all credential-related incidents' or 'incidents affecting payment services'.",
+  "tags": ["vigil", "reporter"],
+  "agent": "vigil-reporter",
+  "index": "vigil-incidents",
+  "retrieval_strategy": "hybrid",
+  "text_field": "investigation_summary",
+  "vector_field": "investigation_summary_vector",
+  "filter": {
+    "bool": {
+      "must": [
+        { "terms": { "status": ["resolved", "escalated", "suppressed"] } }
+      ]
+    }
+  },
+  "result_fields": [
+    "incident_id",
+    "incident_type",
+    "severity",
+    "status",
+    "created_at",
+    "resolved_at",
+    "total_duration_seconds",
+    "investigation_summary",
+    "root_cause",
+    "affected_service",
+    "resolution_type",
+    "reflection_count"
+  ],
+  "max_results": 50
+}

@@ -1,0 +1,22 @@
+{
+  "id": "vigil-report-compliance-evidence",
+  "type": "esql",
+  "description": "Produces per-incident audit trail data for compliance documentation. Returns resolved and escalated incidents with full lifecycle fields, timing metrics, agent attribution, and verification results for the reporting period.",
+  "tags": ["vigil", "reporter"],
+  "agent": "vigil-reporter",
+  "configuration": {
+    "query": "FROM vigil-incidents | WHERE created_at >= ?window_start AND created_at <= ?window_end AND status IN (\"resolved\", \"escalated\", \"suppressed\") | SORT created_at ASC | KEEP incident_id, incident_type, severity, status, resolution_type, affected_service, created_at, resolved_at, total_duration_seconds, ttd_seconds, tti_seconds, ttr_seconds, ttv_seconds, agents_involved, reflection_count, affected_assets.asset_id, affected_assets.criticality, investigation.root_cause, investigation.mitre_techniques, remediation_plan.approval_required, verification_results.health_score, verification_results.passed",
+    "params": {
+      "window_start": {
+        "type": "date",
+        "required": true,
+        "description": "Start of compliance reporting period (ISO 8601)"
+      },
+      "window_end": {
+        "type": "date",
+        "required": true,
+        "description": "End of compliance reporting period (ISO 8601)"
+      }
+    }
+  }
+}
