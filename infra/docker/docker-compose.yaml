@@ -1,0 +1,149 @@
+# Docker Compose for the Vigil demo environment.
+#
+# Usage:
+#   docker compose -f infra/docker/docker-compose.yaml build
+#   docker compose -f infra/docker/docker-compose.yaml up -d
+#
+# Environment variables (set in shell or .env file):
+#   ELASTIC_URL          — Elasticsearch URL (default: http://localhost:9200)
+#   ELASTIC_API_KEY      — Elasticsearch API key
+#   GITHUB_WEBHOOK_SECRET — GitHub webhook HMAC secret
+#   SLACK_SIGNING_SECRET  — Slack signing secret
+#
+# Platform note:
+#   host.docker.internal works on macOS/Windows (Docker Desktop).
+#   On Linux, override ELASTIC_APM_SERVER_URL:
+#     ELASTIC_APM_SERVER_URL=http://172.17.0.1:8200 docker compose up
+#   Or run an APM server as a service in this compose file.
+
+x-common-env: &common-env
+  ELASTIC_APM_SERVER_URL: "${ELASTIC_APM_SERVER_URL:-http://host.docker.internal:8200}"
+  ELASTIC_APM_ENVIRONMENT: production
+  ELASTIC_APM_LOG_LEVEL: info
+  NODE_ENV: production
+
+services:
+  api-gateway:
+    build:
+      context: ../../services/api-gateway
+    container_name: vigil-api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      <<: *common-env
+      ELASTIC_APM_SERVICE_NAME: api-gateway
+      PAYMENT_SERVICE_URL: "http://payment-service:8081"
+      USER_SERVICE_URL: "http://user-service:8082"
+      NOTIFICATION_SERVICE_URL: "http://notification-svc:8083"
+    depends_on:
+      payment-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      notification-svc:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    networks:
+      - vigil-demo
+    restart: unless-stopped
+
+  payment-service:
+    build:
+      context: ../../services/payment-service
+    container_name: vigil-payment-service
+    ports:
+      - "8081:8081"
+    environment:
+      <<: *common-env
+      ELASTIC_APM_SERVICE_NAME: payment-service
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    networks:
+      - vigil-demo
+    restart: unless-stopped
+
+  user-service:
+    build:
+      context: ../../services/user-service
+    container_name: vigil-user-service
+    ports:
+      - "8082:8082"
+    environment:
+      <<: *common-env
+      ELASTIC_APM_SERVICE_NAME: user-service
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    networks:
+      - vigil-demo
+    restart: unless-stopped
+
+  notification-svc:
+    build:
+      context: ../../services/notification-svc
+    container_name: vigil-notification-svc
+    ports:
+      - "8083:8083"
+    environment:
+      <<: *common-env
+      ELASTIC_APM_SERVICE_NAME: notification-svc
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8083/health"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    networks:
+      - vigil-demo
+    restart: unless-stopped
+
+  webhook-server:
+    build:
+      context: ../..
+      dockerfile_inline: |
+        FROM node:20-alpine
+        RUN apk add --no-cache dumb-init
+        WORKDIR /app
+        COPY package.json package-lock.json* ./
+        RUN npm ci --production
+        COPY --chown=node:node src/ ./src/
+        ENV NODE_ENV=production
+        USER node
+        EXPOSE 3000
+        HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+          CMD wget --quiet --tries=1 --spider http://localhost:3000/health || exit 1
+        CMD ["dumb-init", "node", "-e", "import('./src/webhook-server/index.js').then(m => m.startServer())"]
+    container_name: vigil-webhook-server
+    ports:
+      - "3000:3000"
+    environment:
+      WEBHOOK_PORT: "3000"
+      ELASTIC_URL: "${ELASTIC_URL:-http://host.docker.internal:9200}"
+      ELASTIC_API_KEY: "${ELASTIC_API_KEY:-}"
+      GITHUB_WEBHOOK_SECRET: "${GITHUB_WEBHOOK_SECRET:-}"
+      SLACK_SIGNING_SECRET: "${SLACK_SIGNING_SECRET:-}"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    networks:
+      - vigil-demo
+    restart: unless-stopped
+
+networks:
+  vigil-demo:
+    driver: bridge

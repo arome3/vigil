@@ -225,9 +225,10 @@ export async function handleTriageRequest(envelope) {
 
   // Race tool execution against an overall deadline so slow tools
   // can't block the handler beyond the 5-second SLA.
-  const deadline = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('Triage deadline exceeded')), TRIAGE_DEADLINE_MS)
-  );
+  let deadlineId;
+  const deadline = new Promise((_, reject) => {
+    deadlineId = setTimeout(() => reject(new Error('Triage deadline exceeded')), TRIAGE_DEADLINE_MS);
+  });
 
   let enrichmentResult, fpRateResult, assetResult;
   try {
@@ -241,6 +242,8 @@ export async function handleTriageRequest(envelope) {
     enrichmentResult = enrichmentResult ?? { status: 'rejected', reason: err };
     fpRateResult = fpRateResult ?? { status: 'rejected', reason: err };
     assetResult = assetResult ?? { status: 'rejected', reason: err };
+  } finally {
+    clearTimeout(deadlineId);
   }
 
   // 3. Extract results with graceful degradation

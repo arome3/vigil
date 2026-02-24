@@ -9,7 +9,12 @@
   "scripts": {
     "bootstrap": "bash scripts/bootstrap.sh",
     "dev": "node src/webhooks/github-receiver.js",
-    "test": "node --test tests/**/*.js",
+    "test": "node --experimental-test-module-mocks --test 'tests/unit/**/*.test.js' && NODE_OPTIONS='--experimental-vm-modules' npx jest",
+    "test:unit": "node --experimental-test-module-mocks --test 'tests/unit/**/*.test.js'",
+    "test:jest": "NODE_OPTIONS='--experimental-vm-modules' npx jest",
+    "test:agents": "NODE_OPTIONS='--experimental-vm-modules' npx jest --selectProjects agents",
+    "test:integration": "NODE_OPTIONS='--experimental-vm-modules' npx jest --selectProjects integration",
+    "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' npx jest --coverage",
     "demo:scenario1": "node scripts/demo/scenario-1-compromised-key.js",
     "demo:scenario2": "node scripts/demo/scenario-2-bad-deployment.js",
     "demo:all": "node scripts/demo/run-all.js",

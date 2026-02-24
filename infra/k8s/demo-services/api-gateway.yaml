@@ -1,0 +1,109 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+  namespace: vigil-demo
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: demo-service
+    app.kubernetes.io/part-of: vigil
+data:
+  ELASTIC_APM_SERVICE_NAME: api-gateway
+  ELASTIC_APM_SERVER_URL: "http://elastic-agent:8200"
+  ELASTIC_APM_ENVIRONMENT: production
+  ELASTIC_APM_LOG_LEVEL: info
+  PAYMENT_SERVICE_URL: "http://payment-service:8081"
+  USER_SERVICE_URL: "http://user-service:8082"
+  NOTIFICATION_SERVICE_URL: "http://notification-svc:8083"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: vigil-demo
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: demo-service
+    app.kubernetes.io/part-of: vigil
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: api-gateway
+        app.kubernetes.io/component: demo-service
+        app.kubernetes.io/part-of: vigil
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: api-gateway
+          image: vigil-demo/api-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: api-gateway-config
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ["ALL"]
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: vigil-demo
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: demo-service
+    app.kubernetes.io/part-of: vigil
+spec:
+  # NodePort for kind access; change to ClusterIP behind an Ingress in production.
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: api-gateway
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080
+      protocol: TCP

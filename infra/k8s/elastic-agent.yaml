@@ -1,0 +1,246 @@
+# Elastic Agent DaemonSet for the Vigil demo environment.
+# Collects APM traces, container logs (filestream), and system metrics.
+#
+# Prerequisites:
+#   1. Create the elasticsearch-credentials secret:
+#      kubectl create secret generic elasticsearch-credentials \
+#        --namespace=vigil-demo \
+#        --from-literal=elasticsearch-url=https://your-es-host:9243 \
+#        --from-literal=api-key=your-base64-encoded-api-key
+#
+#   2. Apply the namespace first:
+#      kubectl apply -f infra/k8s/namespace.yaml
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: elastic-agent
+  namespace: vigil-demo
+  labels:
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/component: observability
+    app.kubernetes.io/part-of: vigil
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vigil-elastic-agent
+  labels:
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/part-of: vigil
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "nodes", "namespaces", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["nodes/stats", "nodes/metrics"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vigil-elastic-agent
+  labels:
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/part-of: vigil
+subjects:
+  - kind: ServiceAccount
+    name: elastic-agent
+    namespace: vigil-demo
+roleRef:
+  kind: ClusterRole
+  name: vigil-elastic-agent
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elastic-agent-config
+  namespace: vigil-demo
+  labels:
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/component: observability
+    app.kubernetes.io/part-of: vigil
+data:
+  elastic-agent.yml: |
+    outputs:
+      default:
+        type: elasticsearch
+        hosts: ["${ELASTICSEARCH_URL}"]
+        api_key: "${ELASTICSEARCH_API_KEY}"
+        ssl:
+          verification_mode: certificate
+
+    inputs:
+      # APM Server — receives traces from demo services
+      - type: apm
+        name: apm-server
+        use_output: default
+        apm-server:
+          host: "0.0.0.0:8200"
+          rum:
+            enabled: false
+          auth:
+            anonymous:
+              enabled: true
+              allow_agent: ["nodejs"]
+
+      # Container logs via filestream
+      - type: filestream
+        name: container-logs
+        use_output: default
+        id: container-logs
+        paths:
+          - /var/log/containers/*.log
+        parsers:
+          - container:
+              format: auto
+        processors:
+          - add_kubernetes_metadata:
+              host: ${NODE_NAME}
+              default_indexers.enabled: false
+              default_matchers.enabled: false
+              indexers:
+                - container: {}
+              matchers:
+                - logs_path:
+                    logs_path: /var/log/containers/
+
+      # System metrics (CPU, memory, network)
+      - type: system/metrics
+        name: system-metrics
+        use_output: default
+        id: system-metrics
+        data_stream:
+          namespace: vigil-demo
+        streams:
+          - metricset: cpu
+            data_stream:
+              dataset: system.cpu
+            period: 30s
+          - metricset: memory
+            data_stream:
+              dataset: system.memory
+            period: 30s
+          - metricset: network
+            data_stream:
+              dataset: system.network
+            period: 30s
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elastic-agent
+  namespace: vigil-demo
+  labels:
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/component: observability
+    app.kubernetes.io/part-of: vigil
+spec:
+  # NodePort for kind access; change to ClusterIP in production.
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: elastic-agent
+  ports:
+    - name: apm
+      port: 8200
+      targetPort: 8200
+      nodePort: 30200
+      protocol: TCP
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: elastic-agent
+  namespace: vigil-demo
+  labels:
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/component: observability
+    app.kubernetes.io/part-of: vigil
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: elastic-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: elastic-agent
+        app.kubernetes.io/component: observability
+        app.kubernetes.io/part-of: vigil
+    spec:
+      serviceAccountName: elastic-agent
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+      containers:
+        - name: elastic-agent
+          image: docker.elastic.co/beats/elastic-agent:9.3.0
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: ELASTICSEARCH_URL
+              valueFrom:
+                secretKeyRef:
+                  name: elasticsearch-credentials
+                  key: elasticsearch-url
+            - name: ELASTICSEARCH_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: elasticsearch-credentials
+                  key: api-key
+          ports:
+            - containerPort: 8200
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          volumeMounts:
+            - name: config
+              mountPath: /usr/share/elastic-agent/elastic-agent.yml
+              subPath: elastic-agent.yml
+              readOnly: true
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: proc
+              mountPath: /hostfs/proc
+              readOnly: true
+            - name: cgroup
+              mountPath: /hostfs/sys/fs/cgroup
+              readOnly: true
+          securityContext:
+            runAsUser: 0
+      volumes:
+        - name: config
+          configMap:
+            name: elastic-agent-config
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: cgroup
+          hostPath:
+            path: /sys/fs/cgroup

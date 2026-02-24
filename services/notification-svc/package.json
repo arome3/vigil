@@ -1,0 +1,13 @@
+{
+  "name": "vigil-demo-notification-svc",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node -r elastic-apm-node/start.js src/index.js"
+  },
+  "dependencies": {
+    "elastic-apm-node": "^4.0.0",
+    "express": "^4.21.0",
+    "winston": "^3.14.0"
+  }
+}

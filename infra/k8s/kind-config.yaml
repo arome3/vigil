@@ -1,0 +1,37 @@
+# kind cluster configuration for the Vigil demo environment.
+# Usage: kind create cluster --config infra/k8s/kind-config.yaml --name vigil-demo
+#
+# After cluster creation, load local images:
+#   kind load docker-image vigil-demo/api-gateway:latest --name vigil-demo
+#   kind load docker-image vigil-demo/payment-service:latest --name vigil-demo
+#   kind load docker-image vigil-demo/user-service:latest --name vigil-demo
+#   kind load docker-image vigil-demo/notification-svc:latest --name vigil-demo
+#
+# NOTE: When using kind, services need NodePort type to be reachable from the host.
+# The extraPortMappings below map host ports to NodePorts on the control-plane node.
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      # Demo services
+      - containerPort: 30080
+        hostPort: 8080
+        protocol: TCP
+      - containerPort: 30081
+        hostPort: 8081
+        protocol: TCP
+      - containerPort: 30082
+        hostPort: 8082
+        protocol: TCP
+      - containerPort: 30083
+        hostPort: 8083
+        protocol: TCP
+      # Elastic Agent APM intake
+      - containerPort: 30200
+        hostPort: 8200
+        protocol: TCP
+    extraMounts:
+      - hostPath: /var/log
+        containerPath: /var/log
