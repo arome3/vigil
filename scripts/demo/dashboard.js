@@ -17,7 +17,9 @@ import logUpdate from 'log-update';
 const SCENARIO_PIPELINES = {
   1: ['triage', 'investigator', 'threat-hunter', 'commander', 'executor', 'verifier'],
   2: ['sentinel', 'investigator', 'commander', 'executor', 'verifier'],
-  3: ['triage', 'investigator', 'commander', 'executor', 'verifier']
+  3: ['triage', 'investigator', 'commander', 'executor', 'verifier'],
+  // Reflection Loop shares the same pipeline shape as scenario 3 but is a distinct demo
+  rl: ['triage', 'investigator', 'commander', 'executor', 'verifier']
 };
 
 // State icons
@@ -53,9 +55,11 @@ const STATE_COLORS = {
 };
 
 export class Dashboard {
-  constructor(scenarioName, scenarioNumber) {
+  constructor(scenarioName, scenarioNumber, options = {}) {
     this.scenarioName = scenarioName;
     this.scenarioNumber = scenarioNumber;
+    this.headerLabel = options.label || `Scenario ${scenarioNumber}`;
+    this.autoApprove = options.autoApprove || false;
     this.pipeline = SCENARIO_PIPELINES[scenarioNumber] || SCENARIO_PIPELINES[1];
     this.startTime = null;
     this.agentStates = {};
@@ -184,7 +188,14 @@ export class Dashboard {
     const timer = chalk.dim(`\u23F1 ${elapsed} elapsed`);
 
     const titleLine = `${title}${' '.repeat(Math.max(2, w - 30 - elapsed.length - 14))}${timer}`;
-    const scenarioLine = `Scenario ${this.scenarioNumber}: ${this.scenarioName}${' '.repeat(Math.max(2, w - this.scenarioName.length - 24))}${status}`;
+    const badge = this.autoApprove ? '  ' + chalk.cyan('AUTO-APPROVE') : '';
+    const prefix = `${this.headerLabel}: ${this.scenarioName}`;
+    const prefixLen = this.headerLabel.length + 2 + this.scenarioName.length;
+    const statusStr = status + badge;
+    // 6 = ANSI overhead estimate for status icon color
+    const statusPlain = (this.result ? '✓ DONE' : '● LIVE') + (this.autoApprove ? '  AUTO-APPROVE' : '');
+    const gap = Math.max(2, w - prefixLen - statusPlain.length - 4);
+    const scenarioLine = `${prefix}${' '.repeat(gap)}${statusStr}`;
 
     return [
       b.top,
@@ -396,6 +407,9 @@ export class Dashboard {
       return '"The agent identified the exact commit, author, and code change\n             \u2014 context that takes a human SRE 15-30 minutes."';
     }
     if (this.scenarioNumber === 3) {
+      return '"11 agents vs. credential stuffing. Contained, verified, closed."';
+    }
+    if (this.scenarioNumber === 'rl') {
       return '"When the first fix didn\'t work, Vigil didn\'t give up.\n             It re-investigated and tried a different approach. Autonomously."';
     }
     return null;

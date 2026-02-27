@@ -12,8 +12,16 @@ export default function AgentsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const { mockAgents } = await import("@/data/mock/agents");
-        setAgents(mockAgents);
+        if (process.env.NEXT_PUBLIC_DEMO_MODE === "true") {
+          const { mockAgents } = await import("@/data/mock/agents");
+          setAgents(mockAgents);
+        } else {
+          const { getAgents } = await import("@/lib/api");
+          const a = await getAgents();
+          setAgents(a);
+        }
+      } catch (e) {
+        console.error("Failed to load agents:", e);
       } finally {
         setLoading(false);
       }

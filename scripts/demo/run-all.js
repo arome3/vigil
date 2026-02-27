@@ -6,10 +6,10 @@
 import chalk from 'chalk';
 import { runScenario1 } from './scenario-1-compromised-key.js';
 import { runScenario2 } from './scenario-2-bad-deployment.js';
-import { runScenario3 as runScenarioReflection } from './scenario-reflection-loop.js';
-import { runScenario3 as runScenarioBruteForce } from './scenario-3-brute-force.js';
+import { runScenario3 } from './scenario-3-brute-force.js';
 import { runScenario4 } from './scenario-4-insider-threat.js';
 import { runScenario5 } from './scenario-5-cascading-failure.js';
+import { runReflectionLoop } from './scenario-reflection-loop.js';
 import { cleanupSilent } from './cleanup.js';
 import { stopPolling } from './agent-poller.js';
 import { createLogger } from '../../src/utils/logger.js';
@@ -17,12 +17,12 @@ import { createLogger } from '../../src/utils/logger.js';
 const log = createLogger('demo-runner');
 
 const scenarios = [
-  { num: 1, name: 'Compromised API Key',                  run: runScenario1 },
-  { num: 2, name: 'Cascading Deployment Failure',         run: runScenario2 },
-  { num: 3, name: 'Self-Healing Failure (Reflection Loop)', run: runScenarioReflection },
-  { num: 4, name: 'Brute Force Login Attack',             run: runScenarioBruteForce },
-  { num: 5, name: 'Insider Threat (Off-Hours)',           run: runScenario4 },
-  { num: 6, name: 'Cascading Service Failure',            run: runScenario5 }
+  { num: 1,    name: 'Compromised API Key',                  run: runScenario1 },
+  { num: 2,    name: 'Cascading Deployment Failure',         run: runScenario2 },
+  { num: 3,    name: 'Brute Force Login Attack',             run: runScenario3 },
+  { num: 4,    name: 'Insider Threat (Off-Hours)',           run: runScenario4 },
+  { num: 5,    name: 'Cascading Service Failure',            run: runScenario5 },
+  { num: 'RL', name: 'Self-Healing Failure (Reflection Loop)', run: runReflectionLoop }
 ];
 
 // Graceful shutdown

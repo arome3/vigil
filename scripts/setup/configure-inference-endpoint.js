@@ -21,7 +21,7 @@ const providerConfigs = {
     service_settings: {
       api_key: process.env.OPENAI_API_KEY,
       model_id: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-large',
-      dimensions: 1024
+      dimensions: 384
     }
   }),
 

@@ -34,8 +34,16 @@ export default function IncidentsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const { mockIncidents } = await import("@/data/mock/incidents");
-        setIncidents(mockIncidents);
+        if (process.env.NEXT_PUBLIC_DEMO_MODE === "true") {
+          const { mockIncidents } = await import("@/data/mock/incidents");
+          setIncidents(mockIncidents);
+        } else {
+          const { getIncidents } = await import("@/lib/api");
+          const inc = await getIncidents();
+          setIncidents(inc);
+        }
+      } catch (e) {
+        console.error("Failed to load incidents:", e);
       } finally {
         setLoading(false);
       }

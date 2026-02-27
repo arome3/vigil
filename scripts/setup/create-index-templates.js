@@ -144,7 +144,7 @@ const templates = [
           investigation_summary: { type: 'text' },
           investigation_summary_vector: {
             type: 'dense_vector',
-            dims: 1024,
+            dims: 384,
             index: true,
             similarity: 'cosine',
             index_options: { type: 'int8_hnsw' }
@@ -280,7 +280,7 @@ const templates = [
           root_cause:            { type: 'text' },
           root_cause_vector: {
             type: 'dense_vector',
-            dims: 1024,
+            dims: 384,
             index: true,
             similarity: 'cosine',
             index_options: { type: 'int8_hnsw' }
@@ -353,7 +353,7 @@ const templates = [
           content:               { type: 'text' },
           content_vector: {
             type: 'dense_vector',
-            dims: 1024,
+            dims: 384,
             index: true,
             similarity: 'cosine',
             index_options: { type: 'int8_hnsw' }
@@ -435,7 +435,7 @@ const templates = [
           description:           { type: 'text' },
           description_vector: {
             type: 'dense_vector',
-            dims: 1024,
+            dims: 384,
             index: true,
             similarity: 'cosine',
             index_options: { type: 'int8_hnsw' }
@@ -575,7 +575,7 @@ const templates = [
           summary:                { type: 'text', analyzer: 'standard' },
           summary_vector: {
             type: 'dense_vector',
-            dims: 1024,
+            dims: 384,
             similarity: 'cosine',
             index: true
           },
@@ -622,7 +622,7 @@ const templates = [
               narrative:          { type: 'text', analyzer: 'standard' },
               narrative_vector: {
                 type: 'dense_vector',
-                dims: 1024,
+                dims: 384,
                 similarity: 'cosine',
                 index: true
               },

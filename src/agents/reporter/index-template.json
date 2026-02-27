@@ -35,7 +35,7 @@
             "narrative":        { "type": "text", "analyzer": "standard" },
             "narrative_vector": {
               "type": "dense_vector",
-              "dims": 1024,
+              "dims": 384,
               "similarity": "cosine",
               "index": true
             },

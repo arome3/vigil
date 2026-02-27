@@ -26,7 +26,7 @@ BASE_DELAY_S = 0.5
 
 # ── Deterministic pseudo-vectors ────────────────────────────
 
-def pseudo_vector(text, dims=1024):
+def pseudo_vector(text, dims=384):
     """Generate a deterministic pseudo-vector from text content.
 
     Uses SHA-256 to seed a gaussian RNG, then L2-normalises the result.
@@ -153,7 +153,7 @@ class EmbeddingGenerator:
         body = {
             "input": texts,
             "model": "text-embedding-3-large",
-            "dimensions": 1024,
+            "dimensions": 384,
         }
         result = _http_post(url, headers, body)
         return [item["embedding"] for item in result["data"]]

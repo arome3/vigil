@@ -12,6 +12,7 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3000/ws/vigil";
 const MAX_RECONNECT_DELAY = 30_000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+const WS_ENABLED = process.env.NEXT_PUBLIC_WS_ENABLED === "true";
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
@@ -25,8 +26,8 @@ export function useWebSocket() {
   const approvalStore = useApprovalStore();
 
   useEffect(() => {
-    // In demo mode, simulate connected state
-    if (IS_DEMO) {
+    // Skip WebSocket in demo mode or when WS is not explicitly enabled
+    if (IS_DEMO || !WS_ENABLED) {
       connectionStore.setStatus("connected");
       return;
     }

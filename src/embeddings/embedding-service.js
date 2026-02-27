@@ -29,7 +29,7 @@ async function embedViaOpenAI(input) {
     {
       input: texts,
       model: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-large',
-      dimensions: 1024
+      dimensions: 384
     },
     {
       headers: {

@@ -13,16 +13,17 @@ import chalk from 'chalk';
 import client from '../../src/utils/elastic-client.js';
 import { stopPolling } from './agent-poller.js';
 
-const scenarioNumber = parseInt(process.argv[2], 10);
+const scenarioArg = process.argv[2]?.toLowerCase();
+const validArgs = ['1', '2', '3', '4', '5', 'rl'];
 
-if (![1, 2, 3, 4, 5, 6].includes(scenarioNumber)) {
-  console.error('Usage: node scripts/demo/run-scenario.js <1|2|3|4|5|6>');
-  console.error('  1 — Compromised API Key (Security Flow)');
-  console.error('  2 — Cascading Deployment Failure (Operational Flow)');
-  console.error('  3 — Self-Healing Failure (Reflection Loop)');
-  console.error('  4 — Brute Force Login Attack (Security Flow)');
-  console.error('  5 — Insider Threat — Off-Hours Data Access (Security Flow)');
-  console.error('  6 — Cascading Service Failure / Memory Leak (Operational Flow)');
+if (!validArgs.includes(scenarioArg)) {
+  console.error('Usage: node scripts/demo/run-scenario.js <1|2|3|4|5|rl>');
+  console.error('  1  — Compromised API Key (Security Flow)');
+  console.error('  2  — Cascading Deployment Failure (Operational Flow)');
+  console.error('  3  — Brute Force Login Attack (Security Flow)');
+  console.error('  4  — Insider Threat — Off-Hours Data Access (Security Flow)');
+  console.error('  5  — Cascading Service Failure / Memory Leak (Operational Flow)');
+  console.error('  rl — Self-Healing Failure (Reflection Loop)');
   process.exit(1);
 }
 
@@ -65,19 +66,20 @@ async function run() {
   await preflight();
 
   const scenarios = {
-    1: { module: './scenario-1-compromised-key.js', fn: 'runScenario1' },
-    2: { module: './scenario-2-bad-deployment.js', fn: 'runScenario2' },
-    3: { module: './scenario-reflection-loop.js', fn: 'runScenario3' },
-    4: { module: './scenario-3-brute-force.js', fn: 'runScenario3' },
-    5: { module: './scenario-4-insider-threat.js', fn: 'runScenario4' },
-    6: { module: './scenario-5-cascading-failure.js', fn: 'runScenario5' }
+    1:    { module: './scenario-1-compromised-key.js',  fn: 'runScenario1' },
+    2:    { module: './scenario-2-bad-deployment.js',    fn: 'runScenario2' },
+    3:    { module: './scenario-3-brute-force.js',       fn: 'runScenario3' },
+    4:    { module: './scenario-4-insider-threat.js',     fn: 'runScenario4' },
+    5:    { module: './scenario-5-cascading-failure.js',  fn: 'runScenario5' },
+    rl:   { module: './scenario-reflection-loop.js',     fn: 'runReflectionLoop' }
   };
 
-  const { module: mod, fn } = scenarios[scenarioNumber];
+  const { module: mod, fn } = scenarios[scenarioArg];
   const scenarioModule = await import(mod);
   const result = await scenarioModule[fn]();
 
-  console.log(`\n  ${chalk.bold('Scenario')} ${scenarioNumber} finished: ${result.verified ? chalk.green('VERIFIED') : chalk.yellow('INJECT ONLY')}`);
+  const label = scenarioArg === 'rl' ? 'Reflection Loop' : `Scenario ${scenarioArg}`;
+  console.log(`\n  ${chalk.bold(label)} finished: ${result.verified ? chalk.green('VERIFIED') : chalk.yellow('INJECT ONLY')}`);
   console.log(`  Duration: ${result.duration}s\n`);
 }
 

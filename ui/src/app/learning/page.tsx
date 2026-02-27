@@ -32,8 +32,16 @@ export default function LearningPage() {
   useEffect(() => {
     async function load() {
       try {
-        const { mockLearningRecords } = await import("@/data/mock/learning");
-        setRecords(mockLearningRecords);
+        if (process.env.NEXT_PUBLIC_DEMO_MODE === "true") {
+          const { mockLearningRecords } = await import("@/data/mock/learning");
+          setRecords(mockLearningRecords);
+        } else {
+          const { getLearningRecords } = await import("@/lib/api");
+          const recs = await getLearningRecords();
+          setRecords(recs);
+        }
+      } catch (e) {
+        console.error("Failed to load learning records:", e);
       } finally {
         setLoading(false);
       }

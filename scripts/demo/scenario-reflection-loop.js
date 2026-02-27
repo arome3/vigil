@@ -1,4 +1,4 @@
-// Scenario 3: Self-Healing Failure — The Reflection Loop
+// Reflection Loop: Self-Healing Failure
 //
 // Demonstrates: Verifier failure detection, reflection loop (re-investigation),
 //               self-correcting remediation pipeline.
@@ -25,7 +25,7 @@ import {
 import client from '../../src/utils/elastic-client.js';
 import { createLogger } from '../../src/utils/logger.js';
 
-const log = createLogger('demo-scenario-3');
+const log = createLogger('demo-reflection-loop');
 const skipVerify = process.argv.includes('--skip-verify');
 
 /**
@@ -62,9 +62,9 @@ async function injectMetrics(serviceName, { count = 500, errorRate = 0.005, time
   return count;
 }
 
-export async function runScenario3() {
+export async function runReflectionLoop() {
   const start = Date.now();
-  const dashboard = new Dashboard('Self-Healing Failure', 3);
+  const dashboard = new Dashboard('Self-Healing Failure', 'rl', { label: 'Reflection Loop', autoApprove: true });
   dashboard.start();
 
   // ── Wave 1: Initial anomaly — connection pool exhaustion ──────
@@ -133,7 +133,7 @@ export async function runScenario3() {
     await client.update({
       index: 'vigil-incidents',
       id: incidentId,
-      doc: { suppress_health_injection: true },
+      doc: { suppress_health_injection: true, approval_status: 'approved', approval_method: 'auto' },
       retry_on_conflict: 5
     });
     dashboard.addActivity('system', 'Suppress flag set \u2014 mock handlers will not auto-inject healthy metrics');
@@ -214,9 +214,9 @@ const thisFile = resolve(fileURLToPath(import.meta.url));
 const entryFile = resolve(process.argv[1]);
 
 if (thisFile === entryFile) {
-  runScenario3()
+  runReflectionLoop()
     .then(result => {
-      console.log('Scenario 3 finished:', result.verified ? 'VERIFIED' : 'INJECT ONLY');
+      console.log('Reflection Loop finished:', result.verified ? 'VERIFIED' : 'INJECT ONLY');
     })
     .catch(err => {
       log.error(err.message);

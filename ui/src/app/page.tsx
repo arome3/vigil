@@ -30,7 +30,53 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadData() {
+    const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
+    async function loadLive() {
+      try {
+        const { getDashboardMetrics, getServiceHealth, getActivityFeed, getIncidents } = await import("@/lib/api");
+        const [metrics, health, activity, inc] = await Promise.all([
+          getDashboardMetrics(),
+          getServiceHealth(),
+          getActivityFeed(),
+          getIncidents(),
+        ]);
+        setDashboard(metrics);
+        setServiceHealth(health);
+        setActivityFeed(activity);
+        setIncidents(inc);
+        // Derive timeline from incidents — pad full 24h window with empty buckets
+        const buckets = new Map<string, { critical: number; high: number; medium: number; low: number }>();
+        const nowMs = Date.now();
+        for (let h = 23; h >= 0; h--) {
+          const d = new Date(nowMs - h * 3600_000);
+          const key = d.toISOString().slice(0, 13) + ":00:00Z";
+          buckets.set(key, { critical: 0, high: 0, medium: 0, low: 0 });
+        }
+        inc.forEach((i) => {
+          const hour = i.created_at?.slice(0, 13) + ":00:00Z";
+          const b = buckets.get(hour) ?? { critical: 0, high: 0, medium: 0, low: 0 };
+          if (i.severity in b) b[i.severity as keyof typeof b]++;
+          buckets.set(hour, b);
+        });
+        setTimelineData(
+          Array.from(buckets.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([time, counts]) => ({ time: time.slice(11, 16), ...counts }))
+        );
+        // Change correlations from investigations
+        setCorrelations(inc.filter((i) => i.investigation?.change_correlation?.matched).map((i) => {
+          const cc = i.investigation!.change_correlation!;
+          return { incident_id: i.id, commit_sha: cc.commit_sha, author: cc.author, pr_number: cc.pr_number, time_gap_seconds: cc.time_gap_seconds, confidence: cc.confidence };
+        }));
+      } catch (e) {
+        console.error("Failed to load live dashboard data:", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function loadMock() {
       try {
         const [metricsModule, healthModule, timelineModule, incidentsModule, correlationModule] = await Promise.all([
           import("@/data/mock/metrics"),
@@ -46,12 +92,17 @@ export default function DashboardPage() {
         setTimelineData(metricsModule.mockIncidentTimelineData);
         setCorrelations(correlationModule.mockChangeCorrelations);
       } catch (e) {
-        console.error("Failed to load dashboard data:", e);
+        console.error("Failed to load mock data:", e);
       } finally {
         setLoading(false);
       }
     }
-    loadData();
+
+    if (isDemo) {
+      loadMock();
+    } else {
+      loadLive();
+    }
   }, [setDashboard, setServiceHealth, setActivityFeed, setIncidents]);
 
   if (loading || !dashboard) {
