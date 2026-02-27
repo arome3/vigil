@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="vigil.png" alt="Vigil Logo" width="200">
+
 # VIGIL
 
 ### Autonomous Security Operations Center
