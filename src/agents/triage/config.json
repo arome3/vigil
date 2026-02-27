@@ -1,7 +1,7 @@
 {
   "name": "vigil-triage",
   "description": "First responder — enriches and scores security alerts, filters false positives",
-  "model": "claude-sonnet-4-5-20250929",
+  "model": "claude-sonnet-4-6",
   "system_prompt_file": "system-prompt.md",
   "tools": [
     "vigil-esql-alert-enrichment",

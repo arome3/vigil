@@ -44,6 +44,16 @@ export async function checkApprovalGate(incidentId, action, actionId, options = 
   const timeoutMinutes = options.timeoutMinutes ?? DEFAULT_TIMEOUT_MINUTES;
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
 
+  // Fast path: if the incident was already auto-approved (no interactive Slack),
+  // skip the poll-based gate and approve immediately after dispatching the request.
+  let autoApproved = false;
+  try {
+    const incDoc = await client.get({ index: 'vigil-incidents', id: incidentId });
+    if (incDoc._source?.approval_method === 'auto') {
+      autoApproved = true;
+    }
+  } catch { /* proceed with normal flow */ }
+
   // --- Send approval request ---
   const approvalEnvelope = createEnvelope('vigil-executor', 'vigil-wf-approval', incidentId, {
     task: 'request_approval',
@@ -66,6 +76,11 @@ export async function checkApprovalGate(incidentId, action, actionId, options = 
 
   log.info(`Approval requested for action ${actionId} in incident ${incidentId}`);
 
+  if (autoApproved) {
+    log.info(`Action ${actionId} auto-approved (incident ${incidentId} has approval_method=auto)`);
+    return { status: 'approved', decided_by: 'auto-approve', decided_at: new Date().toISOString() };
+  }
+
   // --- Poll for decision ---
   const timeoutMs = timeoutMinutes * 60 * 1000;
   const deadline = Date.now() + timeoutMs;
@@ -79,8 +94,8 @@ export async function checkApprovalGate(incidentId, action, actionId, options = 
         query: {
           bool: {
             filter: [
-              { term: { incident_id: incidentId } },
-              { term: { action_id: actionId } }
+              { term: { 'incident_id.keyword': incidentId } },
+              { term: { 'action_id.keyword': actionId } }
             ]
           }
         },

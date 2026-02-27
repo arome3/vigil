@@ -69,7 +69,8 @@ function extractAttackChain(result) {
   const events = [];
 
   for (const row of result.values) {
-    const hostname = row[col['host.name']] ?? null;
+    // Use destination.ip as fallback host identifier for network-only queries
+    const hostname = row[col['host.name']] ?? row[col['destination.ip']] ?? null;
     const processName = row[col['process.name']] ?? null;
     const action = row[col['event.action']] ?? null;
 
@@ -188,6 +189,7 @@ async function investigateSecurity(envelope) {
   // --- Step 1: Progressive Attack Chain Tracing ---
   let chainResult = null;
   let chainData = { events: [], hostnames: [], processes: [] };
+  let usedNetworkFallback = false;
 
   for (const hours of TIME_WINDOWS) {
     const now = new Date();
@@ -214,7 +216,28 @@ async function investigateSecurity(envelope) {
 
       log.info(`Attack chain: only ${chainData.events.length} events in ${hours}h window, widening`);
     } catch (err) {
-      log.warn(`Attack chain trace failed for ${hours}h window: ${err.message}`);
+      // If the query fails due to missing columns (e.g. no endpoint data),
+      // fall back to a network-only query using source.ip directly
+      if (indicatorIp && /unknown column/i.test(err.message) && !usedNetworkFallback) {
+        log.info(`Attack chain: endpoint fields unavailable, falling back to network-only query`);
+        usedNetworkFallback = true;
+        try {
+          chainResult = await executeEsqlTool('vigil-esql-attack-chain-network', {
+            window_start: windowStart,
+            window_end: windowEnd,
+            indicator_ip: indicatorIp
+          });
+          chainData = extractAttackChain(chainResult);
+          if (chainData.events.length >= SPARSE_RESULT_THRESHOLD) {
+            log.info(`Attack chain (network): found ${chainData.events.length} events in ${hours}h window`);
+            break;
+          }
+        } catch (fallbackErr) {
+          log.warn(`Network-only attack chain also failed: ${fallbackErr.message}`);
+        }
+      } else {
+        log.warn(`Attack chain trace failed for ${hours}h window: ${err.message}`);
+      }
     }
   }
 

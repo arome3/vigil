@@ -202,8 +202,18 @@ const templates = [
               iteration:         { type: 'integer' },
               health_score:      { type: 'float' },
               passed:            { type: 'boolean' },
+              failure_analysis:  { type: 'text' },
               failure_reason:    { type: 'text' },
-              checked_at:        { type: 'date' }
+              checked_at:        { type: 'date' },
+              criteria_results: {
+                type: 'nested',
+                properties: {
+                  metric:         { type: 'keyword' },
+                  current_value:  { type: 'float' },
+                  threshold:      { type: 'float' },
+                  passed:         { type: 'boolean' }
+                }
+              }
             }
           },
           reflection_count:      { type: 'integer' },
@@ -637,6 +647,25 @@ const templates = [
             }
           },
           status:                 { type: 'keyword' }
+        }
+      }
+    }
+  },
+  {
+    name: 'vigil-tmpl-alert-claims',
+    index_patterns: ['vigil-alert-claims'],
+    priority: 200,
+    template: {
+      settings: {
+        number_of_shards: 1,
+        number_of_replicas: 1
+      },
+      mappings: {
+        properties: {
+          alert_id:              { type: 'keyword' },
+          claimed_at:            { type: 'date' },
+          processed_at:          { type: 'date' },
+          error:                 { type: 'text' }
         }
       }
     }

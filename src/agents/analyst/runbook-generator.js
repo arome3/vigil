@@ -256,8 +256,6 @@ export async function runRunbookGeneration(incidentData) {
   return learningRecord;
 }
 
-// TODO: wire incrementRunbookUsage from verifier after successful resolution
-
 /**
  * Update runbook usage statistics after it is used by Commander/Verifier.
  * Uses exponential decay: new_rate = old_rate * 0.9 + outcome * 0.1

@@ -1,7 +1,7 @@
 {
   "name": "vigil-chat",
   "description": "Conversational assistant for Vigil SOC — answers questions about incidents, agent activity, and system health using natural language",
-  "model": "claude-sonnet-4-5-20250929",
+  "model": "claude-sonnet-4-6",
   "system_prompt_file": "system-prompt.md",
   "tools": [
     "vigil-chat-incident-lookup",

@@ -38,16 +38,25 @@ export async function loadSearchToolDefinition(toolName) {
  * @returns {Promise<{ results: Array, total: number, took: number }>}
  */
 async function executeKeywordSearch(definition, query) {
-  const multiMatch = {
+  // Split query into individual tokens so each value can match independently
+  // against keyword-type fields (multi_match requires exact full-string match
+  // on keyword fields, so "203.0.113.42 198.51.100.10" would fail as one query).
+  const tokens = query.split(/\s+/).filter(Boolean);
+
+  const shouldClauses = tokens.map(token => ({
     multi_match: {
-      query,
+      query: token,
       fields: definition.query_fields
     }
-  };
+  }));
+
+  const matchQuery = shouldClauses.length === 1
+    ? shouldClauses[0]
+    : { bool: { should: shouldClauses, minimum_should_match: 1 } };
 
   const queryBody = definition.filter
-    ? { bool: { must: [multiMatch], filter: [definition.filter] } }
-    : multiMatch;
+    ? { bool: { must: [matchQuery], filter: [definition.filter] } }
+    : matchQuery;
 
   const response = await client.search({
     index: definition.index,

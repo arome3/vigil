@@ -6,9 +6,9 @@
 //
 // Timing budget (A2A timeout = 120s):
 //   getIncidentIteration:  ~1s
-//   waitForStabilization:  60s   (mandatory, outside deadline race)
+//   waitForStabilization:  10s   (default; override via VIGIL_STABILIZATION_WAIT_SECONDS)
 //   health check deadline: 50s   (default, covers parallel I/O)
-//   buffer:                ~9s
+//   buffer:                ~59s
 // Total: ~120s. The deadline covers only the I/O phase.
 //
 // Verification results are NOT indexed here — the Coordinator stores the
@@ -35,8 +35,10 @@ const log = createLogger('verifier-handler');
 const VERIFICATION_DEADLINE_MS =
   parseInt(process.env.VIGIL_VERIFICATION_DEADLINE_MS, 10) || 50_000;
 
-const STABILIZATION_WAIT_SECONDS =
-  parseInt(process.env.VIGIL_STABILIZATION_WAIT_SECONDS, 10) || 60;
+// Re-read on each call so scenarios can adjust at runtime
+function getStabilizationWaitSeconds() {
+  return parseInt(process.env.VIGIL_STABILIZATION_WAIT_SECONDS, 10) || 10;
+}
 
 const HEALTH_SCORE_THRESHOLD =
   parseFloat(process.env.VIGIL_HEALTH_SCORE_THRESHOLD || '0.8');
@@ -277,7 +279,7 @@ export async function handleVerifyRequest(envelope, options = {}) {
 
   // Stabilization wait is mandatory — runs before the deadline race.
   // The deadline covers only the I/O-intensive health check phase.
-  await waitForStabilization(STABILIZATION_WAIT_SECONDS);
+  await waitForStabilization(getStabilizationWaitSeconds());
 
   let verificationResult;
   let deadlineHandle;

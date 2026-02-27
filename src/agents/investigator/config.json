@@ -1,7 +1,7 @@
 {
   "name": "vigil-investigator",
   "description": "Deep-dive analyst — traces attack chains, maps MITRE ATT&CK, correlates code changes",
-  "model": "claude-sonnet-4-5-20250929",
+  "model": "claude-sonnet-4-6",
   "system_prompt_file": "system-prompt.md",
   "tools": [
     "vigil-esql-attack-chain-tracer",

@@ -71,6 +71,18 @@ function preparePayload(definition) {
   delete payload.agent;
   // 'lookupJoinTechPreview' is our internal flag
   delete payload.lookupJoinTechPreview;
+
+  // Agent Builder API only accepts 'type' and 'description' in param defs.
+  // Strip any extra fields (required, default, etc.) that are Vigil-internal.
+  if (payload.configuration?.params) {
+    for (const [key, param] of Object.entries(payload.configuration.params)) {
+      payload.configuration.params[key] = {
+        type: param.type,
+        description: param.description
+      };
+    }
+  }
+
   return payload;
 }
 
@@ -155,7 +167,9 @@ async function run() {
       log.info(`Registered tool: ${result.id}`);
       results.registered++;
     } catch (err) {
-      if (err.response?.status === 409) {
+      const isConflict = err.response?.status === 409 ||
+        (err.response?.status === 400 && err.response?.data?.message?.includes('already exists'));
+      if (isConflict) {
         log.warn(`Tool already exists: ${definition.id}`);
         results.skipped++;
       } else if (err.response?.status === 404) {
@@ -164,6 +178,10 @@ async function run() {
           `Requires Elastic 9.x with Agent Builder enabled.`
         );
         apiAvailable = false;
+        results.skipped++;
+      } else if (err.response?.status === 400) {
+        const msg = err.response?.data?.message || err.message;
+        log.warn(`Skipped ${definition.id} (validation error): ${msg.slice(0, 120)}`);
         results.skipped++;
       } else {
         log.error(

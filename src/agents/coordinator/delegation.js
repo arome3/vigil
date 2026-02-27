@@ -12,11 +12,29 @@ import {
 } from '../../a2a/contracts.js';
 import { escalateIncident, checkConflictingAssessments, checkApprovalTimeout } from './escalation.js';
 import { computeTimingMetrics } from './timing.js';
+import { incrementRunbookUsage } from '../analyst/runbook-generator.js';
 import client from '../../utils/elastic-client.js';
 import { createLogger } from '../../utils/logger.js';
 import { parseThreshold, parsePositiveInt } from '../../utils/env.js';
 
 const log = createLogger('coordinator-delegation');
+
+// --- Runbook usage tracking ---
+
+/**
+ * Update runbook usage stats after an incident outcome is known.
+ * Non-critical — failures are logged but never block the pipeline.
+ */
+async function trackRunbookOutcome(remediationPlan, wasSuccessful) {
+  const runbookId = remediationPlan?.runbook_used;
+  if (!runbookId) return;
+  try {
+    await incrementRunbookUsage(runbookId, wasSuccessful);
+    log.info(`Tracked runbook ${runbookId} outcome: ${wasSuccessful ? 'success' : 'failure'}`);
+  } catch (err) {
+    log.warn(`Failed to track runbook usage for ${runbookId}: ${err.message}`);
+  }
+}
 
 const SUPPRESS_THRESHOLD = parseThreshold('VIGIL_TRIAGE_SUPPRESS_THRESHOLD', 0.4);
 const APPROVAL_TIMEOUT_MINUTES = parsePositiveInt('VIGIL_APPROVAL_TIMEOUT_MINUTES', 15);
@@ -31,7 +49,7 @@ function generateIncidentId() {
   return `INC-${year}-${slug}`;
 }
 
-async function createIncidentDocument(incidentId, triageResponse, incidentType) {
+async function createIncidentDocument(incidentId, triageResponse, incidentType, alertTimestamp) {
   const now = new Date().toISOString();
   const doc = {
     incident_id: incidentId,
@@ -40,7 +58,7 @@ async function createIncidentDocument(incidentId, triageResponse, incidentType) 
     severity: triageResponse.enrichment?.asset_criticality === 'tier-1' ? 'critical' : 'high',
     priority_score: triageResponse.priority_score,
     alert_ids: [triageResponse.alert_id],
-    alert_timestamp: triageResponse.alert_timestamp || now,
+    alert_timestamp: alertTimestamp || triageResponse.alert_timestamp || now,
     affected_services: [],
     affected_assets: [],
     investigation_summary: null,
@@ -72,15 +90,28 @@ async function delegateToAgent(agentId, incidentId, payload) {
 }
 
 async function updateIncidentFields(incidentId, fields) {
-  const { _seq_no, _primary_term } = await getIncident(incidentId);
-  await client.update({
-    index: 'vigil-incidents',
-    id: incidentId,
-    if_seq_no: _seq_no,
-    if_primary_term: _primary_term,
-    doc: { ...fields, updated_at: new Date().toISOString() },
-    refresh: 'wait_for'
-  });
+  const MAX_RETRIES = 3;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const { _seq_no, _primary_term } = await getIncident(incidentId);
+    try {
+      await client.update({
+        index: 'vigil-incidents',
+        id: incidentId,
+        if_seq_no: _seq_no,
+        if_primary_term: _primary_term,
+        doc: { ...fields, updated_at: new Date().toISOString() },
+        refresh: 'wait_for'
+      });
+      return;
+    } catch (err) {
+      if (err.meta?.statusCode === 409 && attempt < MAX_RETRIES) {
+        log.warn(`Conflict updating incident ${incidentId}, retry ${attempt + 1}/${MAX_RETRIES}`);
+        await new Promise(r => setTimeout(r, 100 * (attempt + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
 }
 
 function extractAffectedServices(investigatorResp, threatHunterResp) {
@@ -171,12 +202,15 @@ async function waitForApproval(incidentId) {
 // Security Flow
 // ============================================================
 
-export async function orchestrateSecurityIncident(triageResponse) {
+export async function orchestrateSecurityIncident(triageResponse, rawAlert = {}) {
   const incidentId = generateIncidentId();
   log.info(`Starting security incident orchestration: ${incidentId}`);
 
+  // Extract alert timestamp from raw alert for accurate timing metrics
+  const alertTimestamp = rawAlert['@timestamp'] || rawAlert.timestamp;
+
   // Create incident and transition to triaged (common to both paths)
-  await createIncidentDocument(incidentId, triageResponse, 'security');
+  await createIncidentDocument(incidentId, triageResponse, 'security', alertTimestamp);
   await transitionIncident(incidentId, 'triaged');
 
   // Evaluate suppress guard against the triaged document
@@ -194,15 +228,22 @@ export async function orchestrateSecurityIncident(triageResponse) {
   // Investigate path
   await transitionIncident(incidentId, 'investigating');
 
-  // Build alert context for investigator
+  // Extract real context from raw alert (nested ECS fields with flat fallbacks)
+  const sourceIp = rawAlert.source?.ip || rawAlert.source_ip || '';
+  const destIp = rawAlert.destination?.ip || rawAlert.destination_ip || '';
+  const sourceUser = rawAlert.source?.user_name || rawAlert.user?.name || rawAlert.source_user || '';
+  const assetId = rawAlert.affected_asset?.id || rawAlert.affected_asset_id || '';
+  const assetName = rawAlert.affected_asset?.name || assetId;
+
+  // Build alert context for investigator using raw alert data
   const alertContext = {
     alert_ids: [triageResponse.alert_id],
-    source_ip: triageResponse.enrichment?.source_ip || 'unknown',
-    source_user: triageResponse.enrichment?.source_user || 'unknown',
-    affected_assets: [],
+    source_ip: sourceIp || 'unknown',
+    source_user: sourceUser || 'unknown',
+    affected_assets: assetName ? [assetName] : [],
     severity: triageResponse.priority_score >= 0.7 ? 'high' : 'medium',
     initial_indicators: {
-      ips: [],
+      ips: [...new Set([sourceIp, destIp].filter(Boolean))],
       hashes: [],
       domains: []
     }
@@ -356,7 +397,21 @@ export async function orchestrateOperationalIncident(sentinelReport) {
 // ============================================================
 
 async function executeFromPlanning(incidentId, investigatorResp, threatHunterResp, alertContext, incidentType) {
-  const affectedServices = extractAffectedServices(investigatorResp, threatHunterResp);
+  let affectedServices = extractAffectedServices(investigatorResp, threatHunterResp);
+
+  // Fallback: if no services extracted from investigation, derive from alert context
+  if (affectedServices.length === 0) {
+    const alertAssets = alertContext?.affected_assets || [];
+    if (alertAssets.length > 0) {
+      affectedServices = alertAssets.map(a => typeof a === 'string' ? a : a.asset_id || a.name).filter(Boolean);
+    }
+    // Last resort: use the alert's alert_ids to build a placeholder service
+    if (affectedServices.length === 0) {
+      affectedServices = ['unknown-service'];
+      log.warn(`No affected services found for ${incidentId}, using fallback`);
+    }
+  }
+
   await updateIncidentFields(incidentId, { affected_services: affectedServices });
 
   // --- Commander: Plan Remediation ---
@@ -439,10 +494,18 @@ async function executeFromPlanning(incidentId, investigatorResp, threatHunterRes
   await transitionIncident(incidentId, 'verifying');
   let verifierResp;
   try {
+    // Ensure success_criteria is non-empty — fallback to basic health check.
+    // Each criterion MUST include service_name (verifier validates it) and a
+    // valid operator from ['lte', 'gte', 'eq'].
+    const criteria = commanderResp.remediation_plan.success_criteria?.length > 0
+      ? commanderResp.remediation_plan.success_criteria
+      : affectedServices.map(svc => ({
+          metric: 'error_rate', operator: 'lte', threshold: 5.0, service_name: svc
+        }));
     const verifyPayload = buildVerifyRequest(
       incidentId,
       affectedServices,
-      commanderResp.remediation_plan.success_criteria
+      criteria
     );
     verifierResp = await delegateToAgent('vigil-verifier', incidentId, verifyPayload);
     validateVerifyResponse(verifierResp);
@@ -476,6 +539,7 @@ async function executeFromPlanning(incidentId, investigatorResp, threatHunterRes
       ...metrics,
       resolution_type: 'auto_resolved'
     });
+    await trackRunbookOutcome(commanderResp.remediation_plan, true);
     log.info(`Incident ${incidentId} resolved successfully`);
     return { incidentId, status: 'resolved', metrics };
   }
@@ -602,10 +666,15 @@ export async function handleReflectionLoop(
 
     let verifierResp;
     try {
+      const reflectCriteria = commanderResp.remediation_plan.success_criteria?.length > 0
+        ? commanderResp.remediation_plan.success_criteria
+        : affectedServices.map(svc => ({
+            metric: 'error_rate', operator: 'lte', threshold: 5.0, service_name: svc
+          }));
       const verifyPayload = buildVerifyRequest(
         incidentId,
         affectedServices,
-        commanderResp.remediation_plan.success_criteria
+        reflectCriteria
       );
       verifierResp = await delegateToAgent('vigil-verifier', incidentId, verifyPayload);
       validateVerifyResponse(verifierResp);
@@ -631,6 +700,7 @@ export async function handleReflectionLoop(
         ...metrics,
         resolution_type: 'auto_resolved'
       });
+      await trackRunbookOutcome(commanderResp.remediation_plan, true);
       log.info(`Incident ${incidentId} resolved after reflection loop ${currentDoc.reflection_count}`);
       return { incidentId, status: 'resolved', metrics };
     }
@@ -640,6 +710,10 @@ export async function handleReflectionLoop(
   }
 
   // Exhausted all iterations without resolution — escalate
+  // Transition verifying → reflecting → escalated (state machine requires reflecting step)
+  try { await transitionIncident(incidentId, 'reflecting'); } catch { /* may already be reflecting */ }
+  await transitionIncident(incidentId, 'escalated');
+  await trackRunbookOutcome(lastCommanderResp.remediation_plan, false);
   const { doc } = await getIncident(incidentId);
   await escalateIncident(doc, `Reflection limit reached (${MAX_REFLECTION_LOOPS}/${MAX_REFLECTION_LOOPS})`, {
     root_cause: lastInvestigatorResp.root_cause,

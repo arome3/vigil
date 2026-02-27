@@ -8,7 +8,7 @@ const log = createLogger('reporter-narrative');
 const KIBANA_URL = process.env.KIBANA_URL;
 const LLM_CONNECTOR_ID = process.env.LLM_CONNECTOR_ID;
 const LLM_API_KEY = process.env.LLM_API_KEY;
-const LLM_MODEL = process.env.LLM_MODEL || 'claude-sonnet-4-5-20250929';
+const LLM_MODEL = process.env.LLM_MODEL || 'claude-sonnet-4-6';
 
 // ── Column index builder ────────────────────────────────────────
 
@@ -438,7 +438,7 @@ async function callLlm(prompt) {
         'https://api.anthropic.com/v1/messages',
         {
           model: LLM_MODEL,
-          max_tokens: 1024,
+          max_tokens: 16384,
           messages: [{ role: 'user', content: prompt }]
         },
         {

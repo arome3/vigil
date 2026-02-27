@@ -1,4 +1,4 @@
-// Static configuration validation for the vigil-chat agent and its 6 ES|QL tools.
+// Static configuration validation for the vigil-chat agent and its ES|QL + report tools.
 // No mocking needed — reads JSON/MD files from disk and checks structural invariants.
 // Run: NODE_OPTIONS='--experimental-vm-modules' npx jest tests/agents/chat/chat-agent.test.js
 
@@ -47,7 +47,7 @@ describe('vigil-chat agent configuration', () => {
     expect(config.model).toBeTruthy();
     expect(config.system_prompt_file).toBe('system-prompt.md');
     expect(Array.isArray(config.tools)).toBe(true);
-    expect(config.tools).toHaveLength(6);
+    expect(config.tools).toHaveLength(8);
   });
 
   test('api_key_role_descriptors only contains read privileges', () => {

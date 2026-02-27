@@ -5,7 +5,7 @@
   "tags": ["vigil", "remediation"],
   "agent": "vigil-commander",
   "configuration": {
-    "query": "FROM metrics-apm-* | WHERE @timestamp > NOW() - 5m AND service.name == ?target_service | STATS active_requests = COUNT(*), avg_latency = AVG(transaction.duration.us), error_rate = SUM(CASE(event.outcome == \"failure\", 1, 0)) / COUNT(*) * 100 BY service.name",
+    "query": "FROM vigil-metrics-default | WHERE @timestamp > NOW() - 5m AND service.name == ?target_service | STATS active_requests = COUNT(*), avg_latency = AVG(transaction.duration.us), error_rate = SUM(CASE(event.outcome == \"failure\", 1, 0)) / COUNT(*) * 100 BY service.name",
     "params": {
       "target_service": {
         "type": "keyword",

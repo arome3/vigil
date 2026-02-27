@@ -1,7 +1,7 @@
 {
   "name": "vigil-commander",
   "description": "Tactical planner — formulates remediation plans from runbooks and context",
-  "model": "claude-sonnet-4-5-20250929",
+  "model": "claude-sonnet-4-6",
   "system_prompt_file": "system-prompt.md",
   "tools": [
     "vigil-search-runbooks",

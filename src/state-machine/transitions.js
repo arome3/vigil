@@ -104,21 +104,16 @@ export async function transitionIncident(incidentId, newStatus, metadata = {}) {
     throw new InvalidTransitionError(currentStatus, newStatus, allowed);
   }
 
-  // Guard: redirect reflecting → escalated when reflection limit reached
+  // Guard: redirect reflecting → escalated when reflection limit reached.
+  // Must first complete the reflecting transition so the doc state allows
+  // the subsequent escalated transition (reflecting → escalated is valid,
+  // but the caller's current state e.g. verifying → escalated is not).
   if (newStatus === 'reflecting' && (doc.reflection_count || 0) >= MAX_REFLECTION_LOOPS) {
     log.warn(
       `Reflection limit reached (${doc.reflection_count}/${MAX_REFLECTION_LOOPS}). ` +
       `Auto-escalating incident ${incidentId}.`
     );
-    try {
-      return await transitionIncident(incidentId, 'escalated', {
-        ...metadata,
-        escalation_reason: 'reflection_limit_reached'
-      });
-    } catch (err) {
-      log.error(`Auto-escalation failed for ${incidentId}: ${err.stack || err.message}`);
-      throw err;
-    }
+    // Fall through to complete the verifying → reflecting transition first
   }
 
   const now = new Date().toISOString();
@@ -154,21 +149,42 @@ export async function transitionIncident(incidentId, newStatus, metadata = {}) {
     ));
   }
 
-  // Persist with optimistic concurrency control
-  try {
-    await client.update({
-      index: 'vigil-incidents',
-      id: incidentId,
-      if_seq_no: _seq_no,
-      if_primary_term: _primary_term,
-      doc: updateFields,
-      refresh: 'wait_for'
-    });
-  } catch (err) {
-    if (err.meta?.statusCode === 409) {
-      throw new ConcurrencyError(incidentId);
+  // Persist with optimistic concurrency control + retry on conflict.
+  // External processes (demo scenarios, webhook handlers) may update the
+  // incident doc concurrently, causing seq_no mismatches. Retry by re-reading
+  // the latest doc version and re-applying the update.
+  const MAX_RETRIES = 3;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    // On retry, re-read the latest seq_no/primary_term
+    let seqNo = _seq_no;
+    let primaryTerm = _primary_term;
+    if (attempt > 0) {
+      const latest = await getIncident(incidentId);
+      seqNo = latest._seq_no;
+      primaryTerm = latest._primary_term;
     }
-    throw err;
+
+    try {
+      await client.update({
+        index: 'vigil-incidents',
+        id: incidentId,
+        if_seq_no: seqNo,
+        if_primary_term: primaryTerm,
+        doc: updateFields,
+        refresh: 'wait_for'
+      });
+      break; // success
+    } catch (err) {
+      if (err.meta?.statusCode === 409 && attempt < MAX_RETRIES) {
+        log.warn(`Conflict on transition ${currentStatus} → ${newStatus} for ${incidentId}, retry ${attempt + 1}/${MAX_RETRIES}`);
+        await new Promise(r => setTimeout(r, 100 * (attempt + 1)));
+        continue;
+      }
+      if (err.meta?.statusCode === 409) {
+        throw new ConcurrencyError(incidentId);
+      }
+      throw err;
+    }
   }
 
   // Log audit record

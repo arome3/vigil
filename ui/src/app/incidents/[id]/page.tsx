@@ -19,11 +19,39 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDuration, formatDurationSeconds, formatRelativeTime } from "@/lib/formatters";
 import { AGENT_CONFIG } from "@/lib/constants";
 import { useUIStore } from "@/stores/ui-store";
-import { AlertTriangle, ExternalLink } from "lucide-react";
-import type { Incident } from "@/types/incident";
+import { getIncident, getActivityFeed } from "@/lib/api";
+import { AlertTriangle, ExternalLink, RefreshCw } from "lucide-react";
+import type { Incident, AttackChainEntry } from "@/types/incident";
 import type { AgentActivityEntry, AgentName } from "@/types/agent";
 import type { MitreDetection } from "@/components/visualization/mitre-matrix";
 import Link from "next/link";
+
+const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
+// ─── Derive visualization data from live investigation ──────
+
+function buildGraphElements(chain: AttackChainEntry[]): Array<{ data: Record<string, unknown> }> {
+  const nodes = new Map<string, { data: Record<string, unknown> }>();
+  const edges: Array<{ data: Record<string, unknown> }> = [];
+  for (const entry of chain) {
+    if (entry.source && !nodes.has(entry.source)) {
+      nodes.set(entry.source, { data: { id: entry.source, label: entry.source, type: "service" } });
+    }
+    if (entry.target && !nodes.has(entry.target)) {
+      nodes.set(entry.target, { data: { id: entry.target, label: entry.target, type: "service" } });
+    }
+    if (entry.source && entry.target) {
+      edges.push({ data: { id: `e${entry.step}`, source: entry.source, target: entry.target, label: entry.technique_name, technique_id: entry.technique_id, confidence: entry.confidence } });
+    }
+  }
+  return [...nodes.values(), ...edges];
+}
+
+function buildMitreDetections(chain: AttackChainEntry[], incidentId: string): MitreDetection[] {
+  const seen = new Set<string>();
+  return chain.filter((e) => { if (seen.has(e.technique_id)) return false; seen.add(e.technique_id); return true; })
+    .map((e) => ({ technique_id: e.technique_id, technique_name: e.technique_name, tactic: e.tactic, severity: "high" as const, confidence: e.confidence, incident_ids: [incidentId] }));
+}
 
 export default function IncidentDetailPage() {
   const params = useParams();
@@ -37,6 +65,7 @@ export default function IncidentDetailPage() {
   const [mitreDetections, setMitreDetections] = useState<MitreDetection[]>([]);
   const [activeTab, setActiveTab] = useState("timeline");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     pushContext("incidentDetail");
@@ -62,23 +91,55 @@ export default function IncidentDetailPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [incModule, tlModule, acModule, mitreModule] = await Promise.all([
-          import("@/data/mock/incidents"),
-          import("@/data/mock/timeline"),
-          import("@/data/mock/attack-chain"),
-          import("@/data/mock/mitre"),
-        ]);
-        const found = incModule.mockIncidents.find((i: Incident) => i.id === id) ?? incModule.mockIncidents[0];
-        setIncident(found);
-        setTimeline(tlModule.mockTimelineEntries);
-        setAttackChain(acModule.mockAttackChainElements);
-        setMitreDetections(mitreModule.mockMitreDetections);
+        if (IS_DEMO) {
+          const [incModule, tlModule, acModule, mitreModule] = await Promise.all([
+            import("@/data/mock/incidents"),
+            import("@/data/mock/timeline"),
+            import("@/data/mock/attack-chain"),
+            import("@/data/mock/mitre"),
+          ]);
+          const found = incModule.mockIncidents.find((i: Incident) => i.id === id) ?? incModule.mockIncidents[0];
+          setIncident(found);
+          setTimeline(tlModule.mockTimelineEntries);
+          setAttackChain(acModule.mockAttackChainElements);
+          setMitreDetections(mitreModule.mockMitreDetections);
+        } else {
+          const [incResult, activityResult] = await Promise.allSettled([
+            getIncident(id),
+            getActivityFeed(),
+          ]);
+          if (incResult.status === "rejected") {
+            setError(incResult.reason?.message?.includes("404") ? `Incident ${id} not found` : "Failed to load incident data");
+            return;
+          }
+          const inc = incResult.value;
+          setIncident(inc);
+          const allActivity = activityResult.status === "fulfilled" ? activityResult.value : [];
+          setTimeline(allActivity.filter((a) => a.incident_id === id));
+          const chain = inc.investigation?.attack_chain ?? [];
+          setAttackChain(buildGraphElements(chain));
+          setMitreDetections(buildMitreDetections(chain, inc.id));
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load incident");
       } finally {
         setLoading(false);
       }
     }
     load();
   }, [id]);
+
+  if (error) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <AlertTriangle className="h-10 w-10 text-muted-foreground" />
+        <p className="text-muted-foreground text-sm">{error}</p>
+        <Link href="/incidents">
+          <Button variant="outline" size="sm">Back to incidents</Button>
+        </Link>
+      </div>
+    );
+  }
 
   if (loading || !incident) {
     return (
@@ -226,6 +287,41 @@ export default function IncidentDetailPage() {
                     <span className="font-medium">Total</span>
                     <MonoText>{formatDurationSeconds(incident.timing_metrics.total_duration_seconds)}</MonoText>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Reflection Loops */}
+          {incident.reflection_count > 0 && (
+            <Card className="border-[color:var(--color-state-reflecting)]/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <RefreshCw className="h-3.5 w-3.5" style={{ color: "var(--color-state-reflecting)" }} />
+                  Reflection Loops
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Iterations</span>
+                    <span className="font-mono font-bold" style={{ color: "var(--color-state-reflecting)" }}>{incident.reflection_count}</span>
+                  </div>
+                  {incident._state_timestamps?.reflecting && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Last reflection</span>
+                      <MonoText className="text-muted-foreground">{formatRelativeTime(incident._state_timestamps.reflecting)}</MonoText>
+                    </div>
+                  )}
+                  {incident.status === "reflecting" && (
+                    <div className="flex items-center gap-1.5 text-xs mt-1 px-2 py-1 rounded" style={{ backgroundColor: "rgba(192, 132, 252, 0.15)" }}>
+                      <RefreshCw className="h-3 w-3 animate-spin" style={{ color: "var(--color-state-reflecting)" }} />
+                      <span style={{ color: "var(--color-state-reflecting)" }}>Re-investigating with failure context...</span>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-muted-foreground pt-1 border-t border-border-subtle">
+                    Verification failed — the pipeline re-investigated and re-planned {incident.reflection_count} {incident.reflection_count === 1 ? "time" : "times"}.
+                  </p>
                 </div>
               </CardContent>
             </Card>

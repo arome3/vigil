@@ -9,7 +9,9 @@
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { simulateAlert, simulateLogs, waitForResolution } from './utils.js';
+import { Dashboard } from './dashboard.js';
+import { startPolling, stopPolling } from './agent-poller.js';
+import { simulateAlert, simulateLogs, waitForIncident, waitForResolution } from './utils.js';
 import { createLogger } from '../../src/utils/logger.js';
 
 const log = createLogger('demo-scenario-1');
@@ -17,13 +19,11 @@ const skipVerify = process.argv.includes('--skip-verify');
 
 export async function runScenario1() {
   const start = Date.now();
-
-  console.log('\n╔════════════════════════════════════════════════════════╗');
-  console.log('║  Scenario 1: Compromised API Key — Security Flow      ║');
-  console.log('╚════════════════════════════════════════════════════════╝\n');
+  const dashboard = new Dashboard('Compromised API Key', 1);
+  dashboard.start();
 
   // ── Phase 1: Background — normal authentication activity (24h) ────
-  console.log('[1/4] Injecting background auth logs (200 events, 24h span)...');
+  dashboard.addActivity('system', 'Injecting background auth logs (200 events)...');
   try {
     await simulateLogs('logs-auth-default', {
       count: 200,
@@ -34,14 +34,16 @@ export async function runScenario1() {
       event_action: 'authentication',
       timespan_hours: 24
     });
-    console.log('  -> 200 normal auth events indexed.\n');
+    dashboard.addActivity('system', '\u2713 200 normal auth events indexed');
   } catch (err) {
     log.error(`Phase 1 failed: ${err.message}`);
+    dashboard.addActivity('system', `\u2717 Phase 1 failed: ${err.message}`);
+    dashboard.stop();
     throw new Error('Scenario 1 aborted at Phase 1 (background auth)');
   }
 
   // ── Phase 2: Attack — anomalous auth from unexpected location ─────
-  console.log('[2/4] Injecting attack auth logs (50 events, 1h span)...');
+  dashboard.addActivity('system', 'Injecting attack auth logs (50 events)...');
   try {
     await simulateLogs('logs-auth-default', {
       count: 50,
@@ -52,14 +54,16 @@ export async function runScenario1() {
       event_action: 'authentication',
       timespan_hours: 1
     });
-    console.log('  -> 50 anomalous auth events indexed.\n');
+    dashboard.addActivity('system', '\u2713 50 anomalous auth events indexed');
   } catch (err) {
     log.error(`Phase 2 failed: ${err.message}`);
+    dashboard.addActivity('system', `\u2717 Phase 2 failed: ${err.message}`);
+    dashboard.stop();
     throw new Error('Scenario 1 aborted at Phase 2 (attack auth)');
   }
 
   // ── Phase 3: Exfiltration — data transfer to C2 server ───────────
-  console.log('[3/4] Injecting exfiltration network events (30 events, 1h span)...');
+  dashboard.addActivity('system', 'Injecting exfiltration events (30 events)...');
   try {
     await simulateLogs('logs-network-default', {
       count: 30,
@@ -67,21 +71,24 @@ export async function runScenario1() {
       destination_ip: '198.51.100.10',
       event_action: 'connection',
       event_outcome: 'success',
-      network_bytes: Math.floor(50 * 1024 * 1024 / 30), // ~1.7MB per event, ~50MB total
+      network_bytes: Math.floor(50 * 1024 * 1024 / 30),
       timespan_hours: 1
     });
-    console.log('  -> 30 network exfiltration events indexed.\n');
+    dashboard.addActivity('system', '\u2713 30 exfiltration events indexed');
   } catch (err) {
     log.error(`Phase 3 failed: ${err.message}`);
+    dashboard.addActivity('system', `\u2717 Phase 3 failed: ${err.message}`);
+    dashboard.stop();
     throw new Error('Scenario 1 aborted at Phase 3 (exfiltration)');
   }
 
   // ── Phase 4: Alert — triggers the Vigil pipeline ─────────────────
-  console.log('[4/4] Injecting alert to vigil-alerts-default...');
+  dashboard.addActivity('system', 'Injecting alert \u2014 pipeline activating...');
+  let alert;
   try {
-    const alert = await simulateAlert({
+    alert = await simulateAlert({
       rule_id: 'RULE-GEO-ANOMALY-001',
-      rule_name: 'Geographic Anomaly — API Key Usage from Unexpected Location',
+      rule_name: 'Geographic Anomaly \u2014 API Key Usage from Unexpected Location',
       severity_original: 'high',
       source: {
         ip: '203.0.113.42',
@@ -98,37 +105,45 @@ export async function runScenario1() {
         criticality: 'tier-1'
       }
     });
-    console.log(`  -> Alert indexed: ${alert.alert_id}\n`);
+    dashboard.addActivity('system', `\u2713 Alert ${alert.alert_id} indexed \u2014 agents engaging`);
   } catch (err) {
     log.error(`Phase 4 failed: ${err.message}`);
+    dashboard.addActivity('system', `\u2717 Phase 4 failed: ${err.message}`);
+    dashboard.stop();
     throw new Error('Scenario 1 aborted at Phase 4 (alert injection)');
   }
 
   const injectTime = ((Date.now() - start) / 1000).toFixed(1);
-  console.log(`Data injection complete in ${injectTime}s.`);
-  console.log('');
-  console.log('Expected agent flow:');
-  console.log('  Triage -> Investigator -> Threat Hunter -> Commander -> Executor -> Verifier');
-  console.log('  Target time: ~4m 12s\n');
+  dashboard.addActivity('system', `Data injection complete in ${injectTime}s`);
 
   // ── Phase 5: Verification — poll for resolved incident ────────────
   if (skipVerify) {
-    console.log('--skip-verify: Skipping resolution polling.\n');
+    dashboard.addActivity('system', '--skip-verify: Skipping resolution polling.');
+    dashboard.stop();
     return { success: true, duration: injectTime, verified: false };
   }
 
-  console.log('Waiting for pipeline to resolve incident...');
-  const incident = await waitForResolution({ timeoutMs: 420_000, intervalMs: 15_000 });
+  // Wait for the incident to be created from the alert
+  const incidentId = await waitForIncident(alert.alert_id, 30000);
 
-  const totalTime = ((Date.now() - start) / 1000).toFixed(1);
+  if (incidentId) {
+    startPolling(incidentId, dashboard);
+    // Wait for resolution or timeout (poller handles dashboard.showResult + dashboard.stop)
+    const incident = await waitForResolution({ timeoutMs: 480_000, intervalMs: 15_000 });
+    const totalTime = ((Date.now() - start) / 1000).toFixed(1);
 
-  if (incident) {
-    console.log(`\nIncident ${incident.incident_id} resolved in ${totalTime}s.`);
-    return { success: true, duration: totalTime, verified: true, incident };
+    stopPolling();
+    dashboard.stop();
+
+    if (incident) {
+      return { success: true, duration: totalTime, verified: true, incident };
+    }
+    return { success: true, duration: totalTime, verified: false };
   }
 
-  console.log(`\nResolution not detected after ${totalTime}s (pipeline may still be running).`);
-  return { success: true, duration: totalTime, verified: false };
+  dashboard.addActivity('system', '\u26A0 Timeout waiting for incident creation');
+  dashboard.stop();
+  return { success: true, duration: ((Date.now() - start) / 1000).toFixed(1), verified: false };
 }
 
 // Self-execute when run directly

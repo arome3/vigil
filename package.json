@@ -2,22 +2,28 @@
   "name": "vigil",
   "version": "0.1.0",
   "description": "Autonomous SOC platform built on Elasticsearch Agent Builder",
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=20.0.0"
   },
   "scripts": {
     "bootstrap": "bash scripts/bootstrap.sh",
-    "dev": "node src/webhooks/github-receiver.js",
+    "dev": "node -e \"import('./src/webhook-server/index.js').then(m => m.startServer())\"",
     "test": "node --experimental-test-module-mocks --test 'tests/unit/**/*.test.js' && NODE_OPTIONS='--experimental-vm-modules' npx jest",
     "test:unit": "node --experimental-test-module-mocks --test 'tests/unit/**/*.test.js'",
     "test:jest": "NODE_OPTIONS='--experimental-vm-modules' npx jest",
     "test:agents": "NODE_OPTIONS='--experimental-vm-modules' npx jest --selectProjects agents",
     "test:integration": "NODE_OPTIONS='--experimental-vm-modules' npx jest --selectProjects integration",
     "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' npx jest --coverage",
-    "demo:scenario1": "node scripts/demo/scenario-1-compromised-key.js",
-    "demo:scenario2": "node scripts/demo/scenario-2-bad-deployment.js",
+    "demo:scenario1": "node scripts/demo/run-scenario.js 1",
+    "demo:scenario2": "node scripts/demo/run-scenario.js 2",
+    "demo:scenario3": "node scripts/demo/run-scenario.js 3",
+    "demo:scenario4": "node scripts/demo/run-scenario.js 4",
+    "demo:scenario5": "node scripts/demo/run-scenario.js 5",
+    "demo:scenario6": "node scripts/demo/run-scenario.js 6",
     "demo:all": "node scripts/demo/run-all.js",
+    "demo:cleanup": "node scripts/demo/cleanup.js",
     "dev:ui": "npm --prefix ui run dev -- -p 3001",
     "build:ui": "npm --prefix ui run build"
   },
@@ -34,7 +40,9 @@
   },
   "devDependencies": {
     "@jest/globals": "^30.2.0",
+    "chalk": "^5.6.2",
     "jest": "^30.2.0",
+    "log-update": "^7.1.0",
     "supertest": "^7.2.2"
   }
 }

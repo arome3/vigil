@@ -43,8 +43,8 @@ export async function pollForApproval(incidentId, actionId, options = {}) {
         query: {
           bool: {
             filter: [
-              { term: { incident_id: incidentId } },
-              { term: { action_id: actionId } }
+              { term: { 'incident_id.keyword': incidentId } },
+              { term: { 'action_id.keyword': actionId } }
             ]
           }
         },

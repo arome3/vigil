@@ -25,6 +25,9 @@ warn() {
   echo -e "  ${YELLOW}⚠${NC} $1"
 }
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 # ─── Pre-flight checks ─────────────────────────────────────
 echo -e "${BLUE}Vigil Bootstrap${NC}"
 echo "─────────────────────────────────────────────"
@@ -89,15 +92,23 @@ node scripts/setup/create-data-streams.js || fail "Data stream creation failed"
 ok "Data streams and indices created"
 
 step 4 "Configure inference endpoint"
-node scripts/setup/configure-inference-endpoint.js || fail "Inference endpoint configuration failed"
-ok "Inference endpoint configured"
+if node scripts/setup/configure-inference-endpoint.js 2>&1; then
+  ok "Inference endpoint configured"
+else
+  warn "Inference endpoint skipped (no ML nodes). Vector search will be unavailable."
+fi
 
 step 5 "Create ingest pipelines"
 node scripts/setup/create-ingest-pipelines.js || fail "Ingest pipeline creation failed"
 ok "Ingest pipelines created"
 
 step 6 "Seed reference data"
-python3 scripts/setup/seed-reference-data.py || fail "Seed data loading failed"
+# Use venv Python if available, else fall back to system Python
+PYTHON="${PROJECT_ROOT}/.venv/bin/python3"
+if [ ! -x "$PYTHON" ]; then
+  PYTHON="python3"
+fi
+"$PYTHON" scripts/setup/seed-reference-data.py || fail "Seed data loading failed"
 ok "Reference data seeded"
 
 step 7 "Register ES|QL tools"

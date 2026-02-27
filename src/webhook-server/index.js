@@ -6,6 +6,7 @@ import { createLogger } from '../utils/logger.js';
 import { verifyGitHubSignature, handleGitHubWebhook } from './github-handler.js';
 import { verifySlackSignature } from '../integrations/slack.js';
 import { handleApprovalCallback } from './approval-handler.js';
+import apiRoutes from './api-routes.js';
 
 const log = createLogger('webhook-server');
 
@@ -95,6 +96,10 @@ app.post(
     }
   }
 );
+
+// ─── API routes (serves live ES data to the UI) ─────────────────────
+
+app.use(apiRoutes);
 
 // ─── Health endpoint ──────────────────────────────────────────────────
 

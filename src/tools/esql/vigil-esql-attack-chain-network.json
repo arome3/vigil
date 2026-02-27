@@ -1,0 +1,27 @@
+{
+  "id": "vigil-esql-attack-chain-network",
+  "type": "esql",
+  "description": "Network-only attack chain tracer. Fallback for when endpoint indices are unavailable. Traces connections from a known indicator IP across auth and network logs.",
+  "tags": ["vigil", "investigation"],
+  "agent": "vigil-investigator",
+  "configuration": {
+    "query": "FROM logs-auth-*, logs-network-* | WHERE @timestamp > ?window_start AND @timestamp < ?window_end AND source.ip == ?indicator_ip | STATS event_count = COUNT(*), unique_hosts = COUNT_DISTINCT(destination.ip), earliest = MIN(@timestamp), latest = MAX(@timestamp) BY destination.ip, event.action | SORT earliest ASC | LIMIT 50",
+    "params": {
+      "window_start": {
+        "type": "date",
+        "required": true,
+        "description": "Start of the investigation time window"
+      },
+      "window_end": {
+        "type": "date",
+        "required": true,
+        "description": "End of the investigation time window"
+      },
+      "indicator_ip": {
+        "type": "keyword",
+        "required": true,
+        "description": "IP address to trace connections from"
+      }
+    }
+  }
+}

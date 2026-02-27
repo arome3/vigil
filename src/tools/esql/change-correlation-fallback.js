@@ -123,8 +123,9 @@ export async function executeChangeCorrelationFallback(params = {}, options = {}
   // Client-side join:
   // For each error row, find deployments where:
   //   - deployment.service_name matches error.service.name
-  //   - deployment happened BEFORE the first error
-  //   - time gap is within max_gap_seconds
+  //   - deployment happened NEAR the first error (within max_gap_seconds)
+  // Uses absolute time gap — a deployment can be slightly before or after
+  // the first aggregated error due to log windows, clock skew, or event spread.
   const joined = [];
 
   for (const error of errorRows) {
@@ -136,10 +137,11 @@ export async function executeChangeCorrelationFallback(params = {}, options = {}
       if (deployment.service_name !== serviceName) continue;
 
       const deployTime = parseTimestamp(deployment['@timestamp']);
-      const timeGapSeconds = (firstError.getTime() - deployTime.getTime()) / 1000;
+      const rawGapSeconds = (firstError.getTime() - deployTime.getTime()) / 1000;
+      const absGapSeconds = Math.abs(rawGapSeconds);
 
-      // Deployment must be before the error and within the max gap
-      if (timeGapSeconds <= 0 || timeGapSeconds >= maxGapSeconds) continue;
+      // Deployment must be within the max gap window (either direction)
+      if (absGapSeconds === 0 || absGapSeconds >= maxGapSeconds) continue;
 
       joined.push({
         'service.name': serviceName,
@@ -148,7 +150,7 @@ export async function executeChangeCorrelationFallback(params = {}, options = {}
         'commit.message': deployment['commit.message'] ?? null,
         'commit.author': deployment['commit.author'] ?? null,
         'pr.number': deployment['pr.number'] ?? null,
-        time_gap_seconds: Math.round(timeGapSeconds),
+        time_gap_seconds: Math.round(absGapSeconds),
         'deployment.previous_sha': deployment['deployment.previous_sha'] ?? null
       });
     }

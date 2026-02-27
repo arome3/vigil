@@ -5,7 +5,7 @@
   "tags": ["vigil", "monitoring"],
   "agent": "vigil-sentinel",
   "configuration": {
-    "query": "FROM metrics-apm-*, metrics-system-* | WHERE @timestamp > NOW() - 15m AND service.name == ?service_name | STATS avg_latency = AVG(transaction.duration.us), p95_latency = PERCENTILE(transaction.duration.us, 95), p99_latency = PERCENTILE(transaction.duration.us, 99), error_rate = SUM(CASE(event.outcome == \"failure\", 1, 0)) / COUNT(*) * 100, throughput = COUNT(*) / 15, avg_cpu = AVG(system.cpu.total.pct), avg_memory = AVG(system.memory.used.pct) BY service.name | EVAL latency_deviation = (avg_latency - ?baseline_avg) / ?baseline_stddev | EVAL error_deviation = (error_rate - ?baseline_error_rate) / ?baseline_error_stddev",
+    "query": "FROM vigil-metrics-default | WHERE @timestamp > NOW() - 15m AND service.name == ?service_name | STATS avg_latency = AVG(transaction.duration.us), p95_latency = PERCENTILE(transaction.duration.us, 95), p99_latency = PERCENTILE(transaction.duration.us, 99), error_rate = SUM(CASE(event.outcome == \"failure\", 1, 0)) / COUNT(*) * 100, throughput = COUNT(*) / 15, avg_cpu = AVG(system.cpu.total.pct), avg_memory = AVG(system.memory.used.pct) BY service.name | EVAL latency_deviation = (avg_latency - ?baseline_avg) / ?baseline_stddev | EVAL error_deviation = (error_rate - ?baseline_error_rate) / ?baseline_error_stddev",
     "params": {
       "service_name": {
         "type": "keyword",

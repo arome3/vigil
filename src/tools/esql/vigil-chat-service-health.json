@@ -5,7 +5,7 @@
   "tags": ["vigil", "chat"],
   "agent": "vigil-chat",
   "configuration": {
-    "query": "FROM metrics-apm-*, metrics-system-* | WHERE @timestamp > NOW() - 5m AND service.name == ?service_name | STATS failure_count = SUM(CASE(event.outcome == \"failure\", 1, 0)), total_count = COUNT(*), current_avg_latency = AVG(transaction.duration.us) BY service.name | EVAL current_error_rate = CASE(total_count > 0, ROUND(failure_count * 100.0 / total_count, 2), 0.0), current_throughput = ROUND(total_count / 5.0, 1)",
+    "query": "FROM vigil-metrics-default | WHERE @timestamp > NOW() - 5m AND service.name == ?service_name | STATS failure_count = SUM(CASE(event.outcome == \"failure\", 1, 0)), total_count = COUNT(*), current_avg_latency = AVG(transaction.duration.us) BY service.name | EVAL current_error_rate = CASE(total_count > 0, ROUND(failure_count * 100.0 / total_count, 2), 0.0), current_throughput = ROUND(total_count / 5.0, 1)",
     "params": {
       "service_name": {
         "type": "keyword",

@@ -10,7 +10,7 @@ const providerConfigs = {
   elastic: () => ({
     service: 'elasticsearch',
     service_settings: {
-      model_id: '.multilingual-e5-large',
+      model_id: '.multilingual-e5-small',
       num_allocations: 1,
       num_threads: 1
     }
@@ -56,6 +56,19 @@ async function run() {
 
   const config = configFn();
   log.info(`Configuring inference endpoint "${inferenceId}" with provider: ${provider}`);
+
+  // Check if endpoint already exists
+  try {
+    await client.transport.request({
+      method: 'GET',
+      path: `/_inference/text_embedding/${inferenceId}`
+    });
+    log.warn(`Inference endpoint already exists: ${inferenceId}`);
+    log.info('Inference endpoint ready');
+    return;
+  } catch {
+    // Does not exist — create it
+  }
 
   try {
     await client.transport.request({

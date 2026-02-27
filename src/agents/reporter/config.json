@@ -1,7 +1,7 @@
 {
   "name": "vigil-reporter",
   "description": "Scheduled reporting agent that generates executive summaries, compliance documentation, and operational trend reports from Vigil incident data.",
-  "model": "claude-sonnet-4-5-20250929",
+  "model": "claude-sonnet-4-6",
   "system_prompt_file": "system-prompt.md",
   "tools": [
     "vigil-report-executive-summary",

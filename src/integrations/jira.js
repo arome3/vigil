@@ -97,11 +97,16 @@ export async function createIncidentTicket(incident, investigationSummary, actio
   log.info(`Creating Jira ticket for ${incident.incident_id}`);
 
   // Idempotency: check for existing ticket with same incident_id
+  // Uses POST /rest/api/3/search/jql (the GET endpoint was removed — HTTP 410)
   const searchResp = await withBreaker('jira', () =>
     httpRequest({
-      method: 'GET',
-      url: apiUrl(`search?jql=${encodeURIComponent(`project = ${JIRA_PROJECT_KEY} AND labels = "vigil" AND labels = "incident-${incident.incident_id}"`)}&maxResults=1`),
-      headers: requestHeaders()
+      method: 'POST',
+      url: apiUrl('search/jql'),
+      headers: requestHeaders(),
+      data: {
+        jql: `project = ${JIRA_PROJECT_KEY} AND labels = "vigil" AND labels = "incident-${incident.incident_id}"`,
+        maxResults: 1
+      }
     })
   );
   if (searchResp.data.total > 0) {

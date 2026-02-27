@@ -28,9 +28,11 @@ export async function handleApprovalCallback(payload) {
     return { incidentId: null, action: null, updatedBy: null, indexed: false };
   }
 
-  // Extract incident_id from action_id (strip vigil_approve_/vigil_reject_/vigil_info_ prefix)
-  const incidentId = action.action_id.replace(/^vigil_(?:approve|reject|info)_/, '');
-  if (!incidentId || !/^[A-Za-z0-9_-]+$/.test(incidentId)) {
+  // Extract incident_id from action_id (e.g. vigil_approve_INC-2026-1DD0B_0)
+  // Strip the prefix and the trailing _N action index.
+  const rawId = action.action_id.replace(/^vigil_(?:approve|reject|info)_/, '');
+  const incidentId = rawId.replace(/_\d+$/, '');
+  if (!incidentId || !/^[A-Za-z0-9-]+$/.test(incidentId)) {
     log.warn(`Invalid incident ID extracted: ${incidentId}`);
     return { incidentId: null, action: null, updatedBy: null, indexed: false };
   }
@@ -65,6 +67,20 @@ export async function handleApprovalCallback(payload) {
       }
     });
     log.info(`Indexed approval response: ${normalizedValue} for ${incidentId} action ${actionId} by ${userName}`);
+
+    // Update the incident document so waitForApproval() polling picks it up
+    const approvalStatus = normalizedValue === 'approve' ? 'approved' : 'rejected';
+    await client.update({
+      index: 'vigil-incidents',
+      id: incidentId,
+      doc: {
+        approval_status: approvalStatus,
+        approval_user: userName,
+        approval_timestamp: new Date().toISOString()
+      },
+      retry_on_conflict: 3
+    });
+    log.info(`Updated incident ${incidentId} approval_status=${approvalStatus}`);
   } catch (err) {
     log.error(`Failed to index approval response for ${incidentId}: ${err.message}`);
     return { incidentId, action: normalizedValue, updatedBy: userName, indexed: false };

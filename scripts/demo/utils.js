@@ -333,3 +333,92 @@ export async function waitForResolution(opts = {}) {
   log.warn('Resolution polling timed out — pipeline may still be running');
   return null;
 }
+
+// ─── Incident polling ────────────────────────────────────────────
+
+/**
+ * Poll vigil-incidents for an incident created from a given alert.
+ * Returns the incident_id string or null on timeout.
+ *
+ * @param {string} alertId — The alert_id to look for in the incident's alert_ids field
+ * @param {number} [timeoutMs=30000] — Max time to poll
+ * @returns {Promise<string|null>} — The incident_id, or null if timed out
+ */
+export async function waitForIncident(alertId, timeoutMs = 30000) {
+  const deadline = Date.now() + timeoutMs;
+
+  log.info(`Polling vigil-incidents for incident linked to alert ${alertId}...`);
+
+  while (Date.now() < deadline) {
+    try {
+      const result = await client.search({
+        index: 'vigil-incidents',
+        query: { term: { alert_ids: alertId } },
+        size: 1
+      });
+
+      const hit = result.hits?.hits?.[0];
+      if (hit) {
+        const incidentId = hit._source.incident_id;
+        log.info(`Incident found: ${incidentId}`);
+        return incidentId;
+      }
+    } catch (err) {
+      log.warn(`waitForIncident poll error (will retry): ${err.message}`);
+    }
+
+    await new Promise(r => setTimeout(r, 2000));
+  }
+
+  log.warn(`waitForIncident timed out after ${timeoutMs}ms`);
+  return null;
+}
+
+/**
+ * Poll vigil-incidents for an incident reaching a target status.
+ *
+ * @param {string} incidentId — The incident_id to track
+ * @param {string} targetStatus — The status to wait for (e.g., 'verifying', 'resolved')
+ * @param {number} [timeoutMs=180000] — Max time to poll
+ * @param {Object} [opts={}]
+ * @param {number} [opts.min_reflection_count] — If set, also require reflection_count >= this value
+ * @returns {Promise<boolean>} — true if matched, false on timeout
+ */
+export async function waitForIncidentStatus(incidentId, targetStatus, timeoutMs = 180000, opts = {}) {
+  const deadline = Date.now() + timeoutMs;
+
+  log.info(`Polling incident ${incidentId} for status "${targetStatus}"...`);
+
+  while (Date.now() < deadline) {
+    try {
+      const result = await client.search({
+        index: 'vigil-incidents',
+        query: { term: { incident_id: incidentId } },
+        size: 1
+      });
+
+      const hit = result.hits?.hits?.[0];
+      if (hit) {
+        const inc = hit._source;
+        if (inc.status === targetStatus) {
+          if (opts.min_reflection_count !== undefined) {
+            if ((inc.reflection_count || 0) >= opts.min_reflection_count) {
+              log.info(`Incident ${incidentId} reached "${targetStatus}" with reflection_count >= ${opts.min_reflection_count}`);
+              return true;
+            }
+          } else {
+            log.info(`Incident ${incidentId} reached status "${targetStatus}"`);
+            return true;
+          }
+        }
+      }
+    } catch (err) {
+      log.warn(`waitForIncidentStatus poll error (will retry): ${err.message}`);
+    }
+
+    await new Promise(r => setTimeout(r, 2000));
+  }
+
+  log.warn(`waitForIncidentStatus timed out after ${timeoutMs}ms`);
+  return false;
+}

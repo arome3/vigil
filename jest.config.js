@@ -48,7 +48,12 @@ export default {
         '<rootDir>/tests/webhook-server/**/*.test.js',
         '<rootDir>/tests/reporter/**/*.test.js'
       ],
-      testPathIgnorePatterns: ['tests/unit/'],
+      testPathIgnorePatterns: [
+        'tests/unit/',
+        // vector-search uses node:test API and requires live Elasticsearch;
+        // run it via: node --test tests/tools/vector-search.test.js
+        'tests/tools/vector-search\\.test\\.js'
+      ],
       testTimeout: 10000
     }
   ]

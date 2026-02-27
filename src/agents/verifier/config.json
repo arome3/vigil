@@ -1,7 +1,7 @@
 {
   "name": "vigil-verifier",
   "description": "Quality assurance -- verifies remediation worked by comparing metrics to baselines",
-  "model": "claude-sonnet-4-5-20250929",
+  "model": "claude-sonnet-4-6",
   "system_prompt_file": "system-prompt.md",
   "tools": [
     "vigil-esql-health-comparison",

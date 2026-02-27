@@ -31,6 +31,18 @@ const embeddingPipelines = [
 ];
 
 export async function createEmbeddingPipelines() {
+  // Check if the inference endpoint exists before creating embedding pipelines
+  try {
+    await client.transport.request({
+      method: 'GET',
+      path: '/_inference/text_embedding/vigil-embedding-model'
+    });
+  } catch {
+    log.warn('Inference endpoint "vigil-embedding-model" not found — skipping embedding pipelines.');
+    log.warn('Vector search will be unavailable. Add ML nodes and re-run bootstrap to enable.');
+    return;
+  }
+
   for (const { id, description, input_field, output_field } of embeddingPipelines) {
     await client.ingest.putPipeline({
       id,

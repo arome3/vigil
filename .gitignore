@@ -26,8 +26,10 @@ __pycache__/
 docs/
 *.md
 !README.md
+!SUBMISSION.md
 
 # UI (Next.js)
 ui/.next/
 ui/node_modules/
 ui/out/
+ui/test-results/

@@ -5,7 +5,7 @@
   "tags": ["vigil", "verification"],
   "agent": "vigil-verifier",
   "configuration": {
-    "query": "FROM metrics-apm-*, metrics-system-* | WHERE @timestamp > NOW() - 5m AND service.name == ?service_name | STATS current_avg_latency = AVG(transaction.duration.us), current_error_rate = SUM(CASE(event.outcome == \"failure\", 1, 0)) / COUNT(*) * 100, current_throughput = COUNT(*) / 5, current_cpu = AVG(system.cpu.total.pct), current_memory = AVG(system.memory.used.pct) BY service.name | EVAL latency_within_baseline = CASE(current_avg_latency <= ?baseline_avg + (?baseline_stddev * 2), true, false) | EVAL error_rate_acceptable = CASE(current_error_rate <= ?max_error_rate, true, false) | EVAL throughput_recovered = CASE(current_throughput >= ?min_throughput, true, false)",
+    "query": "FROM vigil-metrics-default | WHERE @timestamp > NOW() - 5m AND service.name == ?service_name | STATS current_avg_latency = AVG(transaction.duration.us), current_error_rate = SUM(CASE(event.outcome == \"failure\", 1, 0)) / COUNT(*) * 100, current_throughput = COUNT(*) / 5, current_cpu = AVG(system.cpu.total.pct), current_memory = AVG(system.memory.used.pct) BY service.name | EVAL latency_within_baseline = CASE(current_avg_latency <= ?baseline_avg + (?baseline_stddev * 2), true, false) | EVAL error_rate_acceptable = CASE(current_error_rate <= ?max_error_rate, true, false) | EVAL throughput_recovered = CASE(current_throughput >= ?min_throughput, true, false)",
     "params": {
       "service_name": {
         "type": "keyword",

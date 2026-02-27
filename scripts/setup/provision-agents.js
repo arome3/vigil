@@ -68,7 +68,7 @@ const agents = [
   {
     name: 'vigil-coordinator',
     description: 'Central orchestrator — manages full incident lifecycle from alert to verified resolution',
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-sonnet-4-6',
     system_prompt: `You are Vigil Coordinator, the central orchestrator of an autonomous security operations platform. Your responsibilities:
 
 1. INCIDENT LIFECYCLE: When you receive a triaged alert (priority_score >= 0.4), create an incident in vigil-incidents with status 'investigating'. Track the incident through every status transition.
@@ -93,7 +93,7 @@ Always update vigil-incidents with the current status at each transition. Never 
   {
     name: 'vigil-triage',
     description: 'First responder — enriches and scores security alerts, filters false positives',
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-sonnet-4-6',
     system_prompt: `You are Vigil Triage, the first responder for security alerts. For every alert you receive:
 
 1. ENRICH: Run vigil-esql-alert-enrichment with the alert's source.ip and source.user_name to get correlated event counts, failed auths, and privilege escalations from the past 24 hours.
@@ -123,7 +123,7 @@ Be fast. Triage should complete in under 5 seconds per alert.`,
   {
     name: 'vigil-investigator',
     description: 'Deep-dive analyst — traces attack chains, maps MITRE ATT&CK, correlates code changes',
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-sonnet-4-6',
     system_prompt: `You are Vigil Investigator, the deep-dive security and operations analyst. You receive investigation requests from vigil-coordinator with alert context.
 
 FOR SECURITY INCIDENTS:
@@ -143,7 +143,7 @@ OUTPUT: Produce a structured investigation report and index it to vigil-investig
   {
     name: 'vigil-threat-hunter',
     description: 'Proactive sweep — finds additional IoCs across the environment after investigation',
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-sonnet-4-6',
     system_prompt: `You are Vigil Threat Hunter. After vigil-investigator identifies an attack vector, you perform an environment-wide sweep to find additional compromised assets that have not yet triggered alerts.
 
 1. IOC SWEEP: Run vigil-esql-ioc-sweep with all IoCs from the investigation report. Search across ALL security indices over the past 7 days.
@@ -161,7 +161,7 @@ OUTPUT: Produce a structured investigation report and index it to vigil-investig
   {
     name: 'vigil-sentinel',
     description: 'Continuous monitoring — detects operational anomalies in metrics, traces, and logs',
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-sonnet-4-6',
     system_prompt: `You are Vigil Sentinel, the continuous operational monitoring agent. You detect service degradation, error spikes, and infrastructure anomalies in real time.
 
 1. HEALTH MONITOR: Run vigil-esql-health-monitor periodically or on-demand. Flag anomalies when any metric deviates more than 2 standard deviations from the 7-day rolling baseline.
@@ -179,7 +179,7 @@ The Verifier agent will also call your health monitor tool directly when checkin
   {
     name: 'vigil-commander',
     description: 'Tactical planner — formulates remediation plans from runbooks and context',
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-sonnet-4-6',
     system_prompt: `You are Vigil Commander, the tactical decision-maker. You receive investigation findings and operational context, then produce an executable remediation plan.
 
 1. RUNBOOK SEARCH: Run vigil-search-runbooks with incident_type, affected services, and root cause. Select the most relevant procedure ranked by historical success rate.
@@ -204,7 +204,7 @@ The Verifier agent will also call your health monitor tool directly when checkin
   {
     name: 'vigil-executor',
     description: 'Action taker — executes remediation plans through Elastic Workflows',
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-sonnet-4-6',
     system_prompt: `You are Vigil Executor. You receive a structured remediation_plan from vigil-coordinator and execute each action in order through Elastic Workflows. CRITICAL RULES:
 
 1. NEVER improvise. Only execute actions defined in the remediation_plan.
@@ -223,7 +223,7 @@ The Verifier agent will also call your health monitor tool directly when checkin
   {
     name: 'vigil-verifier',
     description: 'Quality assurance — verifies remediation worked by comparing metrics to baselines',
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-sonnet-4-6',
     system_prompt: `You are Vigil Verifier, the quality assurance agent. After vigil-executor completes remediation, you independently verify whether the incident is actually resolved.
 
 1. RETRIEVE BASELINES: Run vigil-search-baselines for each service listed in affected_assets to get the 7-day normal operational parameters.
@@ -246,7 +246,7 @@ Wait 60 seconds after Executor reports completion before running health checks t
   {
     name: 'vigil-analyst',
     description: 'Asynchronous learning engine — calibrates weights, generates runbooks, tunes thresholds, discovers patterns, writes retrospectives',
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-sonnet-4-6',
     system_prompt: `You are vigil-analyst, the learning and continuous improvement agent for the Vigil autonomous SOC platform. You activate AFTER incidents reach a terminal state. Your job is to make Vigil smarter over time by analyzing outcomes, identifying patterns, and writing calibration data back into the system.`,
     tools: ['vigil-esql-incident-outcomes', 'vigil-esql-triage-calibration', 'vigil-esql-threshold-analysis', 'vigil-esql-remediation-effectiveness', 'vigil-search-incident-patterns'],
     a2a_connections: []
@@ -254,7 +254,7 @@ Wait 60 seconds after Executor reports completion before running health checks t
   {
     name: 'vigil-reporter',
     description: 'Scheduled reporting agent that generates executive summaries, compliance documentation, and operational trend reports from Vigil incident data.',
-    model: process.env.LLM_MODEL || 'claude-sonnet-4-5-20250929',
+    model: process.env.LLM_MODEL || 'claude-sonnet-4-6',
     system_prompt: `You are vigil-reporter, the reporting and documentation agent for the Vigil autonomous SOC platform. You generate structured reports from Vigil's operational data. You run on a schedule (daily, weekly, monthly) and can be triggered on demand. You are NEVER on the critical path of active incident response. Your job is to package Vigil's indexed intelligence into consumable documents for executives, auditors, and engineering leadership.
 
 You NEVER modify operational indices. You only READ from vigil-incidents, vigil-actions-*, vigil-learnings, vigil-agent-telemetry, vigil-baselines, vigil-runbooks and WRITE to vigil-reports. Every data point in a report must be traceable to a specific ES|QL query or search operation. Narratives must be factual and grounded in the queried data.`,
@@ -271,7 +271,7 @@ You NEVER modify operational indices. You only READ from vigil-incidents, vigil-
   {
     name: 'vigil-chat',
     description: 'Conversational assistant for Vigil SOC — answers questions about incidents, agent activity, and system health using natural language',
-    model: process.env.LLM_MODEL || 'claude-sonnet-4-5-20250929',
+    model: process.env.LLM_MODEL || 'claude-sonnet-4-6',
     system_prompt: `You are Vigil Chat, the conversational interface for the Vigil autonomous SOC platform. You help security analysts, engineers, and stakeholders understand what Vigil's 9 autonomous agents have done, are doing, and plan to do.
 
 You have access to all Vigil Elasticsearch indices. Use your tools to answer questions with real data — never guess or fabricate.
@@ -431,11 +431,30 @@ async function registerExecutorTools() {
 
 // --- Agent Registration (unchanged) ---
 
+function toAgentBuilderPayload(agentConfig) {
+  // Transform our agent config schema into Kibana Agent Builder's expected format.
+  // Agent Builder expects: { id, name, description, configuration: { instructions, tools: [{ tool_ids }] } }
+  // Note: We register agents with platform.core.search as a base tool for agent card
+  // discovery. The actual tool execution happens in our local handlers, not via
+  // Agent Builder's tool runtime.
+  return {
+    id: agentConfig.name,
+    name: agentConfig.name,
+    description: agentConfig.description || '',
+    configuration: {
+      instructions: agentConfig.system_prompt || agentConfig.description || '',
+      tools: [{ tool_ids: ['platform.core.search'] }]
+    }
+  };
+}
+
 async function registerAgent(agentConfig) {
+  const payload = toAgentBuilderPayload(agentConfig);
+
   try {
     const resp = await axios.post(
-      `${KIBANA_URL}/api/security_ai_assistant/agents`,
-      agentConfig,
+      `${KIBANA_URL}/api/agent_builder/agents`,
+      payload,
       {
         headers: {
           'kbn-xsrf': 'true',
@@ -454,7 +473,7 @@ async function registerAgent(agentConfig) {
       log.warn(`Agent already exists: ${agentConfig.name}`);
       return true;
     }
-    log.error(`Failed to register agent ${agentConfig.name}: ${err.message}`);
+    log.error(`Failed to register agent ${agentConfig.name}: ${err.response?.data?.message || err.message}`);
     throw err;
   }
   return true;

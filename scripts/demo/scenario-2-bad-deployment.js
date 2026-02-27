@@ -9,21 +9,43 @@
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { simulateGitHubWebhook, simulateErrorSpike, wait, waitForResolution } from './utils.js';
+import { Dashboard } from './dashboard.js';
+import { startPolling, stopPolling } from './agent-poller.js';
+import { simulateAlert, simulateGitHubWebhook, simulateErrorSpike, waitForIncident, waitForResolution } from './utils.js';
 import { createLogger } from '../../src/utils/logger.js';
 
 const log = createLogger('demo-scenario-2');
 const skipVerify = process.argv.includes('--skip-verify');
 
+/**
+ * Wait with a live countdown and educational context about LOOKUP JOIN.
+ */
+async function waitWithCountdown(dashboard, totalSeconds) {
+  dashboard.addActivity('system', '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500');
+  dashboard.addActivity('system', 'Simulating real deployment-to-error gap...');
+  dashboard.addActivity('system', 'In production, errors don\'t appear instantly');
+  dashboard.addActivity('system', 'after a bad deploy. There\'s always a gap.');
+  dashboard.addActivity('system', 'Vigil\'s LOOKUP JOIN correlates events across');
+  dashboard.addActivity('system', 'this exact time window.');
+  dashboard.addActivity('system', '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500');
+
+  for (let remaining = totalSeconds; remaining > 0; remaining--) {
+    dashboard.updateCountdown(`\u23F3 Waiting for errors to surface... ${remaining}s`);
+    await new Promise(r => setTimeout(r, 1000));
+  }
+
+  dashboard.clearCountdown();
+  dashboard.addActivity('system', '\u2713 42 seconds elapsed \u2014 errors emerging');
+}
+
+
 export async function runScenario2() {
   const start = Date.now();
-
-  console.log('\n╔════════════════════════════════════════════════════════╗');
-  console.log('║  Scenario 2: Bad Deployment — Change Correlation      ║');
-  console.log('╚════════════════════════════════════════════════════════╝\n');
+  const dashboard = new Dashboard('Cascading Deployment Failure', 2);
+  dashboard.start();
 
   // ── Phase 1: Deployment webhook — GitHub push event ───────────────
-  console.log('[1/3] Injecting GitHub deployment webhook...');
+  dashboard.addActivity('system', 'Injecting GitHub deployment webhook...');
   try {
     const deployment = await simulateGitHubWebhook({
       event_type: 'deployment',
@@ -53,20 +75,20 @@ export async function runScenario2() {
       additions: 47,
       deletions: 3
     });
-    console.log(`  -> Deployment event indexed: ${deployment.event_id}`);
-    console.log('     Commit: a3f8c21 by jsmith (PR #847)\n');
+    dashboard.addActivity('system', `\u2713 Deployment event indexed: ${deployment.event_id}`);
+    dashboard.addActivity('system', `Commit a3f8c21 by @jsmith (PR #847)`);
   } catch (err) {
     log.error(`Phase 1 failed: ${err.message}`);
+    dashboard.addActivity('system', `\u2717 Phase 1 failed: ${err.message}`);
+    dashboard.stop();
     throw new Error('Scenario 2 aborted at Phase 1 (deployment webhook)');
   }
 
   // ── Phase 2: Wait 42 seconds — realistic deploy-to-error gap ──────
-  console.log('[2/3] Waiting 42 seconds (realistic deployment-to-error gap)...');
-  await wait(42_000);
-  console.log('  -> 42 seconds elapsed.\n');
+  await waitWithCountdown(dashboard, 42);
 
   // ── Phase 3: Error spike — downstream services fail ───────────────
-  console.log('[3/3] Injecting error spike (500 events, 23% error rate, 5 min span)...');
+  dashboard.addActivity('system', 'Injecting error spike (500 events, 23% error rate)...');
   try {
     const result = await simulateErrorSpike({
       service_name: 'api-gateway',
@@ -76,38 +98,82 @@ export async function runScenario2() {
       timespan_minutes: 5,
       affected_services: ['payment-service', 'user-service', 'notification-svc']
     });
-    console.log(`  -> ${result.indexed} service log events indexed (${result.primary_events} primary, ${result.downstream_events} downstream).\n`);
+    dashboard.addActivity('system', `\u2713 ${result.indexed} service log events indexed`);
+    dashboard.addActivity('system', `  (${result.primary_events} primary, ${result.downstream_events} downstream)`);
   } catch (err) {
     log.error(`Phase 3 failed: ${err.message}`);
+    dashboard.addActivity('system', `\u2717 Phase 3 failed: ${err.message}`);
+    dashboard.stop();
     throw new Error('Scenario 2 aborted at Phase 3 (error spike)');
   }
 
-  const injectTime = ((Date.now() - start) / 1000).toFixed(1);
-  console.log(`Data injection complete in ${injectTime}s.`);
-  console.log('');
-  console.log('Expected agent flow:');
-  console.log('  Sentinel -> Investigator (LOOKUP JOIN) -> Commander -> Executor -> Verifier');
-  console.log('  Target time: ~5m 47s');
-  console.log('  Expected verification: error rate returns to 0.12%\n');
+  // ── Phase 4: Alert — Sentinel would detect this; we inject explicitly ──
+  dashboard.addActivity('system', 'Injecting operational alert (Sentinel detection)...');
+  let alert;
+  try {
+    alert = await simulateAlert({
+      rule_id: 'sentinel-error-spike-001',
+      rule_name: 'Sentinel — Error Rate Spike After Deployment (api-gateway)',
+      severity_original: 'high',
+      // Sentinel report fields used by buildSentinelReport()
+      affected_service_tier: 'tier-1',
+      affected_assets: ['api-gateway', 'payment-service', 'user-service'],
+      root_cause_assessment: 'Error rate spike (23%) on api-gateway correlated with deployment a3f8c21',
+      change_correlation: {
+        matched: true,
+        confidence: 'high',
+        commit_sha: 'a3f8c21',
+        pr_number: 847,
+        commit_author: 'jsmith'
+      },
+      // Standard alert fields for triage
+      source: {
+        ip: '10.0.1.100',
+        service_name: 'api-gateway'
+      },
+      affected_asset: {
+        id: 'srv-api-gateway-01',
+        name: 'api-gateway',
+        criticality: 'tier-1'
+      }
+    });
+    dashboard.addActivity('system', `\u2713 Alert ${alert.alert_id} indexed — agents engaging`);
+  } catch (err) {
+    log.error(`Phase 4 failed: ${err.message}`);
+    dashboard.addActivity('system', `\u2717 Phase 4 failed: ${err.message}`);
+    dashboard.stop();
+    throw new Error('Scenario 2 aborted at Phase 4 (alert injection)');
+  }
 
-  // ── Phase 4: Verification — poll for resolved incident ────────────
+  const injectTime = ((Date.now() - start) / 1000).toFixed(1);
+  dashboard.addActivity('system', `Data injection complete in ${injectTime}s`);
+
+  // ── Phase 5: Verification — poll for resolved incident ────────────
   if (skipVerify) {
-    console.log('--skip-verify: Skipping resolution polling.\n');
+    dashboard.addActivity('system', '--skip-verify: Skipping resolution polling.');
+    dashboard.stop();
     return { success: true, duration: injectTime, verified: false };
   }
 
-  console.log('Waiting for pipeline to resolve incident...');
-  const incident = await waitForResolution({ timeoutMs: 480_000, intervalMs: 15_000 });
+  const incidentId = await waitForIncident(alert.alert_id, 30000);
 
-  const totalTime = ((Date.now() - start) / 1000).toFixed(1);
+  if (incidentId) {
+    startPolling(incidentId, dashboard);
+    const incident = await waitForResolution({ timeoutMs: 480_000, intervalMs: 15_000 });
+    const totalTime = ((Date.now() - start) / 1000).toFixed(1);
 
-  if (incident) {
-    console.log(`\nIncident ${incident.incident_id} resolved in ${totalTime}s.`);
-    return { success: true, duration: totalTime, verified: true, incident };
+    stopPolling();
+    dashboard.stop();
+
+    if (incident) {
+      return { success: true, duration: totalTime, verified: true, incident };
+    }
+    return { success: true, duration: totalTime, verified: false };
   }
 
-  console.log(`\nResolution not detected after ${totalTime}s (pipeline may still be running).`);
-  return { success: true, duration: totalTime, verified: false };
+  dashboard.addActivity('system', '\u26A0 Timeout waiting for incident creation');
+  dashboard.stop();
+  return { success: true, duration: ((Date.now() - start) / 1000).toFixed(1), verified: false };
 }
 
 // Self-execute when run directly

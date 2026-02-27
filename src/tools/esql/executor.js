@@ -96,6 +96,11 @@ function coerceParam(name, value, type) {
       return num;
     }
 
+    case 'ip':
+      // Accept strings and arrays of strings (for IN clauses)
+      if (Array.isArray(value)) return value.map(v => String(v));
+      return String(value);
+
     case 'date':
       // Accept ISO 8601 strings and Date objects
       if (value instanceof Date) return value.toISOString();
@@ -105,6 +110,42 @@ function coerceParam(name, value, type) {
     default:
       return value;
   }
+}
+
+/**
+ * Expand array parameters in an ES|QL query.
+ *
+ * ES|QL's parameterized `IN (?param)` doesn't accept array values natively.
+ * This function rewrites `?param` → `?param_0, ?param_1, ...` in the query
+ * and splits the array into individual named params.
+ *
+ * @param {string} query - Original ES|QL query with ?param placeholders
+ * @param {object} validatedParams - Validated parameter key-value pairs
+ * @returns {{ query: string, params: object }} Rewritten query and expanded params
+ */
+function expandArrayParams(query, validatedParams) {
+  const expandedParams = {};
+  let rewrittenQuery = query;
+
+  for (const [name, value] of Object.entries(validatedParams)) {
+    if (Array.isArray(value)) {
+      // Build individual param names: ?name_0, ?name_1, ...
+      const paramNames = value.map((_, i) => `?${name}_${i}`);
+      // Replace ?name with ?name_0, ?name_1, ... in the query
+      rewrittenQuery = rewrittenQuery.replace(
+        new RegExp(`\\?${name}\\b`, 'g'),
+        paramNames.join(', ')
+      );
+      // Add individual params
+      for (let i = 0; i < value.length; i++) {
+        expandedParams[`${name}_${i}`] = value[i];
+      }
+    } else {
+      expandedParams[name] = value;
+    }
+  }
+
+  return { query: rewrittenQuery, params: expandedParams };
 }
 
 /**
@@ -139,9 +180,11 @@ export async function executeEsqlTool(toolName, params = {}, options = {}) {
 
   log.info(`Executing tool: ${definition.id} with ${Object.keys(validatedParams).length} params`);
 
-  // Build ES|QL request body
-  const esqlParams = buildEsqlParams(validatedParams);
-  const body = { query: definition.configuration.query };
+  // Expand array params (e.g. IN (?ips) → IN (?ips_0, ?ips_1)) and build request body
+  const { query: expandedQuery, params: expandedParams } =
+    expandArrayParams(definition.configuration.query, validatedParams);
+  const esqlParams = buildEsqlParams(expandedParams);
+  const body = { query: expandedQuery };
   if (esqlParams.length > 0) {
     body.params = esqlParams;
   }

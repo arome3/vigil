@@ -4,16 +4,16 @@
 
 ### Autonomous Security Operations Center
 
-**9 AI Agents &middot; 21 ES|QL Tools &middot; 8 Search Tools &middot; 7 Elastic Workflows &middot; Sub-3-Minute Resolution**
+**11 AI Agents &middot; 29 Tools &middot; 7 Elastic Workflows &middot; Sub-3-Minute Resolution**
 
 Built with **Elasticsearch Agent Builder**
 
 ![Node.js](https://img.shields.io/badge/Node.js-20_LTS-339933?logo=node.js&logoColor=white)
 ![Elasticsearch](https://img.shields.io/badge/Elasticsearch-9.3+-005571?logo=elasticsearch&logoColor=white)
-![Claude](https://img.shields.io/badge/Claude_Sonnet-4.5-7C3AED?logo=anthropic&logoColor=white)
+![Claude](https://img.shields.io/badge/Claude_Sonnet-4.6-7C3AED?logo=anthropic&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
-[The Problem](#the-problem) &middot; [Architecture](#architecture) &middot; [Key Features](#key-features) &middot; [Agent System](#the-agent-system) &middot; [Getting Started](#getting-started) &middot; [Demo](#demo-scenarios) &middot; [Tech Stack](#tech-stack)
+[The Problem](#the-problem) &middot; [Production Usage](#production-usage) &middot; [Architecture](#architecture) &middot; [Key Features](#key-features) &middot; [Engineering](#engineering-highlights) &middot; [Agent System](#the-agent-system) &middot; [Getting Started](#getting-started) &middot; [Tech Stack](#tech-stack)
 
 </div>
 
@@ -43,7 +43,7 @@ The fundamental issue is that security monitoring, incident investigation, opera
 
 > *Vigil eliminates the gap between threat detection and operational recovery by deploying a team of specialized AI agents that detect, investigate, respond to, verify resolution of, and learn from security and operational incidents — end-to-end, in minutes, not hours.*
 
-Vigil is an autonomous SOC platform that deploys **9 specialized AI agents** communicating via the **A2A (Agent-to-Agent) protocol**. Agents reason using **ES|QL-powered analytical tools**, retrieve context through **hybrid vector search**, execute actions through **Elastic Workflows**, and learn from outcomes to improve over time. The system operates end-to-end without human intervention for routine incidents, while preserving human-in-the-loop controls for critical decisions.
+Vigil is an autonomous SOC platform that deploys **11 specialized AI agents** communicating via the **A2A (Agent-to-Agent) protocol**. Agents reason using **ES|QL-powered analytical tools**, retrieve context through **hybrid vector search**, execute actions through **Elastic Workflows**, and learn from outcomes to improve over time. The system operates end-to-end without human intervention for routine incidents, while preserving human-in-the-loop controls for critical decisions.
 
 | Metric | Before Vigil | With Vigil |
 |--------|-------------|------------|
@@ -54,6 +54,96 @@ Vigil is an autonomous SOC platform that deploys **9 specialized AI agents** com
 | Alert-to-Resolution Coverage | Fragmented (3+ tools, 2+ teams) | Unified single platform |
 | Audit Compliance | Manual documentation | 100% automated audit trail |
 | Self-Correction | None (requires human re-investigation) | 3-iteration reflection loop |
+
+---
+
+## Production Usage
+
+### How Alerts Enter the System
+
+In production, Vigil watches for incidents from three sources — no manual trigger required:
+
+| Source | How It Works | Example |
+|--------|-------------|---------|
+| **Elastic SIEM Detection Rules** | Kibana detection rules fire and write alerts to `vigil-alerts-default`. Vigil's Alert Watcher polls this data stream and engages agents within seconds. | A brute-force rule triggers after 50 failed logins in 2 minutes |
+| **Sentinel Anomaly Detection** | The Sentinel agent continuously monitors `metrics-*` for deviations beyond 2σ from 7-day baselines. Anomalies are surfaced as incidents automatically. | Error rate on `payment-service` jumps from 0.1% to 12% — Sentinel catches it before any alert rule fires |
+| **GitHub Webhooks** | Deployment events from GitHub are ingested into `github-events-*` via the webhook server. When an anomaly correlates with a recent deploy, Vigil traces it to the exact commit via LOOKUP JOIN. | A push to `main` triggers a deployment; 40 seconds later, latency spikes — Vigil links the two |
+
+### How Teams Use Vigil
+
+**SOC Analysts** — Vigil eliminates alert fatigue. The Triage agent auto-suppresses the 95% of alerts that are false positives and auto-prioritizes the rest. Analysts only see incidents that require human judgment — typically approval decisions for high-impact containment actions (credential revocation, IP blocks, account suspension). The Kibana Chat agent lets analysts ask "what happened with the order-service incident?" in natural language without leaving Kibana.
+
+**SRE / DevOps Teams** — Vigil detects deployment failures before customers report them. Change correlation via LOOKUP JOIN identifies the exact commit, author, and PR that caused an outage. Automated rollback via Kubernetes workflows restores service while the responsible engineer is notified with full context in Slack and Jira — no 3 AM war rooms.
+
+**Security Leadership / CISO** — The Reporter agent generates daily executive summaries, weekly MTTR trend reports, and monthly compliance evidence mapped to SOC 2, ISO 27001, and GDPR Article 33 controls. Every automated action is logged to an immutable audit trail in `vigil-actions-*` — exportable as CSV from Kibana for auditors.
+
+**Incident Commanders** — For critical-severity incidents, the Executor pauses at the approval gate and posts an interactive Slack message with the proposed remediation plan. The commander approves or rejects with a button click (or via the web UI's approval modal with keyboard shortcuts). Full investigation context is attached — no re-investigation needed.
+
+### Operational Flow
+
+```
+                        ┌─────────────────────────────────┐
+                        │      Vigil runs 24/7             │
+                        │  watching alerts + metrics        │
+                        └──────────┬──────────────────────┘
+                                   │
+                    ┌──────────────▼──────────────┐
+                    │     Alert / Anomaly detected │
+                    └──────────────┬──────────────┘
+                                   │
+              ┌────────────────────▼────────────────────┐
+              │  Triage scores priority (0.0 – 1.0)     │
+              └──┬─────────────┬───────────────────┬───┘
+                 │             │                   │
+          Score < 0.4    0.4 – 0.7           Score > 0.7
+                 │             │                   │
+           ┌─────▼───┐  ┌─────▼────┐        ┌─────▼──────┐
+           │Suppress  │  │ Queue    │        │ Investigate │
+           │(auto)    │  │(monitor) │        │ immediately │
+           └──────────┘  └──────────┘        └─────┬──────┘
+                                                   │
+                                    ┌──────────────▼──────────────┐
+                                    │  Full autonomous pipeline    │
+                                    │  Investigate → Plan →        │
+                                    │  Execute → Verify            │
+                                    └──────────────┬──────────────┘
+                                                   │
+                              ┌─────────────────────▼─────────────────────┐
+                              │            Severity check                  │
+                              └──┬──────────────────┬─────────────────┬──┘
+                                 │                  │                 │
+                           Low/Medium          High              Critical
+                                 │                  │                 │
+                          ┌──────▼──────┐   ┌──────▼───────┐  ┌─────▼──────┐
+                          │ Fully auto  │   │ Approval gate│  │ Escalate + │
+                          │ no human    │   │ Slack button │  │ PagerDuty  │
+                          │ needed      │   │ or Web UI    │  │ page       │
+                          └──────┬──────┘   └──────┬───────┘  └─────┬──────┘
+                                 │                  │                │
+                                 └──────────┬───────┘                │
+                                            │                        │
+                                   ┌────────▼────────┐               │
+                                   │ Verify + Learn   │◀──────────────┘
+                                   │ Analyst adjusts  │
+                                   │ triage weights   │
+                                   └─────────────────┘
+```
+
+### What Vigil Connects To
+
+In production, Vigil's Elastic Workflows execute real actions against your infrastructure:
+
+| Integration | What Vigil Does | Protocol |
+|-------------|----------------|----------|
+| **Cloudflare** | Blocks attacker IPs via WAF Rulesets API | REST API |
+| **Okta** | Suspends compromised accounts, enforces MFA | OAuth 2.0 |
+| **Kubernetes** | Restarts pods, scales replicas, rolls back deployments, isolates hosts | K8s API |
+| **Slack** | Sends incident notifications, posts interactive approval buttons, delivers reports | Webhook + API |
+| **Jira** | Creates tickets with investigation findings, updates ticket status through resolution | REST API v3 |
+| **PagerDuty** | Escalates unresolved critical incidents to on-call engineers | Events API v2 |
+| **GitHub** | Receives deployment webhooks for change correlation; triggers rollback workflows | Webhooks + REST |
+
+> The incident simulations in [Getting Started](#step-8-run-an-incident-simulation) exercise this entire pipeline with synthetic telemetry — validating the full flow before connecting to production data sources.
 
 ---
 
@@ -80,7 +170,7 @@ Vigil follows a **4-layer architecture** where each layer builds on the one belo
 │                         Sentinel monitors operations        │
 ├─────────────────────────────────────────────────────────────┤
 │  DATA LAYER             11 Elasticsearch indices            │
-│                         21 ES|QL tools + 8 Search tools     │
+│                         29 tools (21 ES|QL + 8 Search)      │
 │                         Dense vector embeddings (1024-dim)  │
 │                         GitHub webhook ingest pipeline      │
 └─────────────────────────────────────────────────────────────┘
@@ -89,21 +179,21 @@ Vigil follows a **4-layer architecture** where each layer builds on the one belo
 ### Incident Flow
 
 ```
-Alert ──▶ Triage ──▶ Coordinator ──▶ Investigator ──▶ Threat Hunter
-                         │                                   │
-                         │◀──────────────────────────────────┘
-                         │
-                         ▼
-                     Commander ──▶ Executor ──▶ Verifier
-                         ▲                        │
-                         │    Reflection Loop      │
-                         └────────────────────────┘
-                                                   │
-                                              Analyst (async)
-                                        learns from outcomes
+Alert ──▶ Coordinator ──▶ Triage ──▶ Investigator ──▶ Threat Hunter
+               │                                           │
+               │◀──────────────────────────────────────────┘
+               │
+               ▼
+           Commander ──▶ Executor ──▶ Verifier
+               ▲                        │
+               │    Reflection Loop      │
+               └────────────────────────┘
+                                         │
+                                    Analyst (async)
+                              learns from outcomes
 ```
 
-The **Coordinator** acts as the hub in a hub-and-spoke pattern, managing incident state via an **11-state state machine** with guard conditions and enforcing the **A2A protocol** for all inter-agent communication. When the Verifier detects that remediation didn't fully resolve an incident, it triggers a **reflection loop** — re-engaging the investigation and remediation pipeline up to 3 times before escalating to humans. After resolution, the **Analyst** asynchronously processes outcomes to calibrate triage weights, generate runbooks, and tune anomaly thresholds.
+The **Coordinator** acts as the hub in a hub-and-spoke pattern, managing incident state via a **12-state state machine** with guard conditions and enforcing the **A2A protocol** for all inter-agent communication. When the Verifier detects that remediation didn't fully resolve an incident, it triggers a **reflection loop** — re-engaging the investigation and remediation pipeline up to 3 times before escalating to humans. After resolution, the **Analyst** asynchronously processes outcomes to calibrate triage weights, generate runbooks, and tune anomaly thresholds.
 
 ---
 
@@ -115,7 +205,7 @@ The **Coordinator** acts as the hub in a hub-and-spoke pattern, managing inciden
 
 **Dense Vector Search** — 1024-dimensional embeddings with `int8_hnsw` quantization powering hybrid (keyword + vector) search across runbooks, threat intelligence, incident history, and MITRE ATT&CK techniques. Enables semantic similarity matching for past incidents and contextual runbook retrieval.
 
-**Autonomous Response** — 6 Elastic Workflows executing containment (IP blocks, account suspension, host isolation), remediation (pod restarts, deployment rollbacks, credential rotation), notifications (Slack, PagerDuty), and ticketing (Jira) — all with full audit trails and rollback capability.
+**Autonomous Response** — 7 Elastic Workflows executing containment (IP blocks, account suspension, host isolation), remediation (pod restarts, deployment rollbacks, credential rotation), notifications (Slack, PagerDuty), and ticketing (Jira) — all with full audit trails and rollback capability.
 
 **Self-Correcting Resolution** — Verifier agent independently validates remediation by comparing post-action health metrics against pre-incident baselines. Composite health score (passed/total >= 0.8) triggers automatic re-investigation if thresholds aren't met, up to 3 reflection iterations.
 
@@ -125,27 +215,49 @@ The **Coordinator** acts as the hub in a hub-and-spoke pattern, managing inciden
 
 ---
 
+## Engineering Highlights
+
+Beyond the agent pipeline, Vigil implements production-grade patterns that distinguish it from typical agent demos:
+
+| Pattern | What It Does |
+|---------|-------------|
+| **Self-Improving Triage** | Analyst computes F1 scores and confusion matrices against actual outcomes, then auto-calibrates triage weights — accuracy improves with every resolved incident |
+| **Deadline Racing with Partial Results** | Every handler runs inside `Promise.race` against a configurable deadline. If time expires, agents return partial results rather than nothing — the pipeline always progresses |
+| **Optimistic Concurrency Control** | Every state transition uses `if_seq_no` / `if_primary_term`. Alert claiming uses `op_type: 'create'`. Zero distributed locks, guaranteed at-most-once processing |
+| **Progressive Time Windows** | Investigator widens search from 1h → 6h → 24h if initial evidence is sparse — catches slow-burn attacks without drowning in noise |
+| **LOOKUP JOIN with Auto-Fallback** | Change correlation uses ES|QL LOOKUP JOIN to bridge deployments with errors. Auto-degrades to a two-query join when unavailable — zero agent changes needed |
+| **ES|QL Array Expansion** | Query executor rewrites `?param` into `?param_0, ?param_1, ...` at runtime, so parameterized tools accept variable-length arrays safely |
+| **Three-Way Hybrid Search** | BM25 + dual kNN (title embeddings + body embeddings) fused via Reciprocal Rank Fusion — lexical precision meets semantic recall |
+| **Conflicting Assessment Escalation** | When Investigator and Threat Hunter disagree, the Coordinator escalates rather than picking a winner — ambiguity is surfaced, not suppressed |
+| **Sliding-Window Circuit Breaker** | External integrations wrapped in a count-based circuit breaker that trips on consecutive failures, preventing cascades into the agent pipeline |
+| **53 Test Files** | In-memory Elasticsearch mock simulates `_seq_no` versioning, `bulk` operations, and `esql.query` — agents tested against realistic concurrency |
+| **434-Line Terminal Dashboard** | Custom real-time TUI renders agent pipeline progress, tool calls, timing bars, and incident summary — zero external dependencies |
+
+---
+
 ## The Agent System
 
-Vigil deploys **9 agents** in a hub-and-spoke topology. The Coordinator delegates tasks to specialized spoke agents via the A2A protocol. Each agent has a dedicated system prompt, scoped tool access, and least-privilege API keys.
+Vigil deploys **11 agents** in a hub-and-spoke topology. The Coordinator delegates tasks to specialized spoke agents via the A2A protocol. Each agent has a dedicated system prompt, scoped tool access, and least-privilege API keys.
 
 | Agent | Role | Tools | Key Capability |
 |-------|------|:-----:|----------------|
-| **vigil-coordinator** | Hub orchestrator | 2 | State machine enforcement, timing metrics, delegation |
+| **vigil-coordinator** | Hub orchestrator | 2 | 12-state machine enforcement, timing metrics, reflection loop management |
 | **vigil-triage** | Priority scoring | 3 | Composite 0.0-1.0 scoring with FP rate suppression |
 | **vigil-investigator** | Root cause analysis | 6 | Attack chain tracing, MITRE mapping, LOOKUP JOIN correlation |
 | **vigil-threat-hunter** | Environment sweep | 2 | IoC scanning, behavioral anomaly detection |
 | **vigil-sentinel** | Operational monitoring | 3 | 2-sigma anomaly detection, dependency tracing, change detection |
 | **vigil-commander** | Remediation planning | 2 | Runbook retrieval (hybrid search), impact assessment |
-| **vigil-executor** | Plan execution | 7 | 6 workflows + audit logging, approval gate enforcement |
+| **vigil-executor** | Plan execution | 7 | 7 workflows + audit logging, approval gate enforcement |
 | **vigil-verifier** | Resolution validation | 2 | Health score computation, baseline comparison, reflection trigger |
-| **vigil-analyst** | Post-incident learning | 5 | Weight calibration, runbook generation, pattern discovery |
+| **vigil-analyst** | Post-incident learning | 5 | Weight calibration, runbook generation, threshold tuning, pattern discovery |
+| **vigil-reporter** | Scheduled reporting | 6 | Executive summaries, compliance evidence (SOC 2, ISO 27001, GDPR), operational trends |
+| **vigil-chat** | Conversational interface | 8 | Natural-language queries about incidents, agents, and system health in Kibana |
 
 ---
 
 ## Tool Ecosystem
 
-Vigil provides **35 purpose-built tools** across three categories: 21 ES|QL analytical tools, 8 search retrieval tools, and 7 Elastic Workflows.
+Vigil provides **29 analytical tools** (21 ES|QL + 8 search) and **7 Elastic Workflows** for automated remediation.
 
 <details>
 <summary><strong>21 ES|QL Tools</strong> — Parameterized analytical queries</summary>
@@ -213,37 +325,118 @@ Vigil provides **35 purpose-built tools** across three categories: 21 ES|QL anal
 
 ### Prerequisites
 
-- **Node.js** 20 LTS or later
-- **Python** 3.11+
-- **Elasticsearch** 9.3+ or Elastic Cloud (Serverless)
-- **Kibana** 9.3+ with Agent Builder enabled
-- LLM connector configured (Claude Sonnet 4.5 recommended)
+**Required accounts:**
 
-### Quick Start
+| Service | Purpose | Sign Up |
+|---------|---------|---------|
+| **Elastic Cloud** | Elasticsearch 9.3+, Kibana, Agent Builder | [cloud.elastic.co](https://cloud.elastic.co) |
+| **Anthropic** | Claude Sonnet 4.6 API key (LLM backbone) | [console.anthropic.com](https://console.anthropic.com) |
+| **Slack** | Incident notifications + approval buttons | [api.slack.com/apps](https://api.slack.com/apps) |
+| **Jira Cloud** | Ticket creation and management | [atlassian.com](https://www.atlassian.com/software/jira) |
+| **GitHub** | Webhook-based deployment tracking | [github.com](https://github.com) |
+
+**Required software:**
+
+| Software | Version | Purpose |
+|----------|---------|---------|
+| Node.js | 20 LTS+ | Backend, setup scripts, demo runner |
+| Python | 3.11+ | Seed data scripts |
+| Docker | Latest | Containerized microservices (optional) |
+| minikube or kind | Latest | Local Kubernetes cluster (optional) |
+
+### Step 1: Provision Elastic Cloud
+
+1. Create a deployment at [cloud.elastic.co](https://cloud.elastic.co).
+2. Select **Elastic 9.3+** or **Serverless** (required for Agent Builder GA + Elastic Workflows).
+3. Recommended sizing: 1 node / 4 GB RAM / 2 vCPUs (demo), 3 nodes / 16 GB RAM each (production).
+4. Enable **Machine Learning node** (required for embedding model).
+5. Note your **Cloud ID**, **Elasticsearch URL**, and **Kibana URL**.
+6. Generate a **master API key** from Kibana → Stack Management → API Keys.
+
+### Step 2: Configure LLM Connector
+
+1. In Kibana, go to **Stack Management → Connectors**.
+2. Create a new **Anthropic** connector with your Claude Sonnet 4.6 API key.
+3. Test the connector with a sample prompt to verify connectivity.
+4. Note the **connector ID** — agents will use this for reasoning.
+
+### Step 3: Set Up External Services
+
+<details>
+<summary><strong>Slack</strong></summary>
+
+1. Create a Slack app at [api.slack.com/apps](https://api.slack.com/apps).
+2. Add bot token scopes: `chat:write`, `chat:postMessage`, `commands`.
+3. Install to your workspace.
+4. Create two channels: `#vigil-incidents` and `#vigil-approvals`.
+5. Note the **Bot Token** (`xoxb-...`) and **Signing Secret**.
+
+</details>
+
+<details>
+<summary><strong>Jira</strong></summary>
+
+1. Create a project with key `VIG`.
+2. Generate an API token for a service account at [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
+3. Note the **base URL** (`https://yourorg.atlassian.net`), **API token**, and **user email**.
+
+</details>
+
+<details>
+<summary><strong>GitHub</strong></summary>
+
+1. Configure a webhook on your repository pointing to `https://your-server/webhooks/github`.
+2. Set events: `push`, `pull_request`, `deployment`.
+3. Set and note the **webhook secret**.
+
+</details>
+
+<details>
+<summary><strong>PagerDuty</strong> (optional)</summary>
+
+1. Create a service and generate a **routing key** for the Events API v2.
+
+</details>
+
+### Step 4: Clone and Configure
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/AroMorin/vigil.git
+git clone https://github.com/arome3/vigil.git
 cd vigil
-
-# 2. Configure environment
 cp .env.example .env
-# Edit .env with your Elastic Cloud, LLM, and integration credentials
+```
 
-# 3. Install dependencies
+Edit `.env` with your credentials from Steps 1–3:
+
+| Variable | What to Enter |
+|----------|--------------|
+| `ELASTIC_CLOUD_ID` | Cloud ID from Step 1 |
+| `ELASTIC_API_KEY` | Master API key from Step 1 |
+| `ELASTIC_URL` | Elasticsearch endpoint URL |
+| `KIBANA_URL` | Kibana endpoint URL |
+| `LLM_API_KEY` | Anthropic Claude API key from Step 2 |
+| `LLM_MODEL` | `claude-sonnet-4-6` (recommended) |
+| `SLACK_BOT_TOKEN` | Slack bot OAuth token from Step 3 |
+| `SLACK_SIGNING_SECRET` | Slack signing secret from Step 3 |
+| `JIRA_BASE_URL` | e.g. `https://yourorg.atlassian.net` |
+| `JIRA_API_TOKEN` | Jira API token from Step 3 |
+| `JIRA_USER_EMAIL` | Service account email |
+| `GITHUB_WEBHOOK_SECRET` | Webhook secret from Step 3 |
+
+See [`.env.example`](.env.example) for the full list including optional tuning variables (`VIGIL_MAX_REFLECTION_LOOPS`, `VIGIL_TRIAGE_*_THRESHOLD`, etc.).
+
+### Step 5: Install and Bootstrap
+
+```bash
+# Install dependencies
 npm install
 pip install -r requirements.txt
 
-# 4. Bootstrap the platform
+# Bootstrap Elasticsearch (creates all indices, agents, tools, workflows)
 npm run bootstrap
-
-# 5. Start the webhook server
-npm run dev
 ```
 
-### What Bootstrap Does
-
-The `npm run bootstrap` command executes a 9-step initialization sequence:
+The bootstrap command executes a **9-step initialization sequence**:
 
 | Step | Action | What It Creates |
 |:----:|--------|-----------------|
@@ -253,13 +446,96 @@ The `npm run bootstrap` command executes a 9-step initialization sequence:
 | 4 | Configure inference endpoint | Embedding model for vector search |
 | 5 | Create ingest pipelines | Auto-embedding on document ingest |
 | 6 | Seed reference data | Runbooks, assets, threat intel, baselines |
-| 7 | Register ES\|QL tools | 12 parameterized query tools |
-| 8 | Provision agents | 9 agents with system prompts and tool bindings |
-| 9 | Deploy workflows | 6 Elastic Workflow definitions |
+| 7 | Register ES\|QL tools | 21 parameterized query tools |
+| 8 | Provision agents | 11 agents with system prompts and tool bindings |
+| 9 | Deploy workflows | 7 Elastic Workflow definitions |
+
+> Steps execute in order — each depends on resources created by the previous step.
+
+### Step 6: Start the Backend
+
+```bash
+npm run dev
+```
+
+This starts the webhook receiver server on port 3000, listening for:
+- **GitHub deployment events** — for change correlation via LOOKUP JOIN
+- **Slack interactive actions** — for human-in-the-loop approval buttons
+
+### Step 7: Start the UI Dashboard
+
+```bash
+# In a second terminal
+npm run dev:ui
+# → http://localhost:3001
+```
+
+For **demo mode** without a live backend (uses mock data):
+
+```bash
+# Set in ui/.env.local:
+NEXT_PUBLIC_DEMO_MODE=true
+```
+
+### Step 8: Run an Incident Simulation
+
+```bash
+# In a third terminal
+npm run demo:scenario1    # Compromised API Key (~4 min)
+npm run demo:scenario2    # Cascading Deployment Failure (~5 min)
+npm run demo:scenario3    # Self-Healing Failure with Reflection Loop (~7 min)
+npm run demo:all          # Run all scenarios sequentially
+```
+
+Watch the agents work autonomously across four interfaces:
+
+| Interface | Where | What You See |
+|-----------|-------|-------------|
+| **Terminal** | The terminal running the demo | Custom dashboard with real-time agent pipeline progress, tool calls, timing |
+| **Web UI** | `http://localhost:3001` | Incident list, agent activity feed, approval gates, analytics |
+| **Slack** | `#vigil-incidents` | Real-time notifications with investigation summaries |
+| **Kibana** | Your Kibana Cloud URL | Command Center dashboard with ES\|QL-powered panels |
+
+### Step 9: Verify Everything Works
+
+| Check | How to Verify |
+|-------|---------------|
+| Elasticsearch connected | Bootstrap completes all 9 steps without errors |
+| Agents provisioned | Kibana → Agent Builder → 11 agents listed |
+| Tools registered | Each agent shows its assigned tools in Agent Builder UI |
+| Workflows deployed | Kibana → Elastic Workflows → 7 workflows listed |
+| Webhook server running | `curl http://localhost:3000/health` returns 200 |
+| UI running | `http://localhost:3001` loads the dashboard |
+| Simulation works end-to-end | `npm run demo:scenario1` — incident reaches `resolved` state |
+| Kibana dashboards | Import via `npm run bootstrap` or manually import `kibana/dashboards/vigil-dashboards.ndjson` |
+
+<details>
+<summary><strong>Optional: Local Kubernetes Demo Services</strong></summary>
+
+For full-fidelity simulations with real container orchestration and APM traces:
+
+```bash
+# Start local cluster (4 CPU, 8 GB minimum)
+minikube start --cpus=4 --memory=8192 --driver=docker
+
+# Deploy demo microservices
+kubectl apply -f infra/k8s/namespace.yaml
+kubectl apply -n vigil-demo -f infra/k8s/demo-services/
+
+# Deploy Elastic Agent (collects logs, metrics, APM traces)
+kubectl apply -n vigil-demo -f infra/k8s/elastic-agent.yaml
+
+# Verify pods are running
+kubectl get pods -n vigil-demo
+```
+
+This deploys 4 microservices (`api-gateway`, `payment-service`, `user-service`, `notification-svc`) that emit real APM traces and logs to Elasticsearch.
+
+</details>
 
 ---
 
-## Demo Scenarios
+## Incident Simulations
 
 ### Scenario 1: Compromised API Key
 
@@ -295,6 +571,55 @@ A code deployment pushes a breaking configuration change to the API Gateway, cau
 5. **Verifier** confirms: error rates back to 0.12% within 3 minutes
 
 **Result: 5 minutes 47 seconds. The agent identified the exact commit, author, and code change — context that takes a human SRE 15-30 minutes of manual git log correlation.**
+
+### Scenario 3: Self-Healing Failure (Reflection Loop)
+
+```bash
+npm run demo:scenario3
+```
+
+A connection pool exhaustion event in the order-service causes a 45% error rate spike. This scenario demonstrates **Vigil's self-correcting reflection loop** — the feature that distinguishes it from every other autonomous agent system.
+
+**Agent Flow — Pass 1 (wrong fix):**
+1. **Triage** enriches the alert — Tier-1 critical asset, 45% error rate, connection pool exhausted → priority score: **0.88**
+2. **Investigator** identifies resource exhaustion pattern, maps blast radius across dependent services
+3. **Commander** plans: restart affected pods, scale replicas, notify operations team
+4. **Executor** fires containment, remediation, and notification workflows
+5. **Verifier** waits 60 seconds for stabilization, then checks — error rate still at 38%. **Health score: 0.45. FAILED.**
+
+**Reflection Loop triggered.** The Verifier's failure analysis is passed back to the Investigator as new context.
+
+**Agent Flow — Pass 2 (correct fix):**
+1. **Investigator** receives the failure analysis — knows pod restart didn't work — runs change correlation, discovers a **connection leak** in the pool handler
+2. **Commander** plans a completely different fix: increase pool size + deploy hotfix
+3. **Executor** fires remediation workflows with the new plan
+4. **Verifier** checks again — error rate at 0.4%. **Health score: 0.95. PASSED.**
+
+**Result: 6 minutes 47 seconds. When the first fix didn't work, Vigil didn't give up. It re-investigated, found the real root cause, planned a different approach, and verified it worked. Autonomously.**
+
+---
+
+## UI Dashboard
+
+Vigil includes a **custom web dashboard** built with Next.js 16, React 19, and Tailwind CSS v4 — a production-grade interface designed for SOC analysts operating under pressure.
+
+```bash
+# Start in demo mode (no backend required)
+NEXT_PUBLIC_DEMO_MODE=true npm --prefix ui run dev
+```
+
+**Key views:**
+
+| View | What It Shows |
+|------|--------------|
+| **Dashboard** (`/`) | Metric tiles with sparkline charts, incident timeline, agent activity feed, service health heatmap (sigma-colored), change correlation table, triage distribution |
+| **Incidents** (`/incidents`) | Filterable incident list with keyboard navigation (`j`/`k`/`Enter`), status badges for all 12 states, severity indicators |
+| **Incident Detail** (`/incidents/[id]`) | 4-tab deep dive — Timeline (agent-colored action log), Investigation (Cytoscape.js attack chain graph + MITRE ATT&CK matrix), Remediation (numbered checklist with status), Verification (health score progress bar with 80% threshold marker) |
+| **Agent Trace** (`/incidents/[id]/trace`) | Flamegraph-style recursive tree showing every agent's tool calls with timing bars, expandable input/output JSON — full pipeline auditability |
+| **Agents** (`/agents`) | Grid of all 11 agents with status indicators, tool call counts, and execution time stats |
+| **Learning** (`/learning`) | Analyst learning records — triage calibrations, generated runbooks, threshold proposals, attack patterns, retrospectives |
+
+**Highlights:** Command palette (`Cmd+K`), human-in-the-loop approval modal with countdown timer and keyboard shortcuts (`A`/`R`), full keyboard navigation, WebSocket real-time updates, and `prefers-reduced-motion` accessibility support.
 
 ---
 
@@ -332,20 +657,24 @@ vigil/
 │   │   ├── message-envelope.js      # A2A message format
 │   │   └── router.js                # Inter-agent message routing
 │   ├── agents/
+│   │   ├── analyst/                 # Post-incident learning agent
+│   │   ├── chat/                    # Conversational Kibana interface
 │   │   ├── commander/               # Remediation planning agent
 │   │   ├── coordinator/             # Hub orchestrator agent
+│   │   ├── executor/                # Plan execution agent
 │   │   ├── investigator/            # Root cause analysis agent
+│   │   ├── reporter/                # Scheduled reporting agent
 │   │   ├── sentinel/                # Operational monitoring agent
 │   │   ├── threat-hunter/           # Environment sweep agent
-│   │   ├── reporter/                # Scheduled reporting agent
-│   │   └── triage/                  # Priority scoring agent
+│   │   ├── triage/                  # Priority scoring agent
+│   │   └── verifier/                # Resolution validation agent
 │   ├── embeddings/                  # Embedding service + ingest pipeline
 │   ├── scoring/                     # Priority scoring formula
 │   ├── search/                      # Hybrid search implementation
-│   ├── state-machine/               # 11-state incident state machine
+│   ├── state-machine/               # 12-state incident state machine
 │   ├── tools/
-│   │   ├── esql/                    # 12 ES|QL tool definitions + executor
-│   │   └── search/                  # 6 search tool definitions + executor
+│   │   ├── esql/                    # 21 ES|QL tool definitions + executor
+│   │   └── search/                  # 8 search tool definitions + executor
 │   ├── utils/                       # Elastic client, logger
 │   └── webhooks/                    # GitHub webhook receiver
 ├── tests/
@@ -354,6 +683,10 @@ vigil/
 │   ├── state-machine/               # State transition tests
 │   └── tools/                       # Tool execution tests
 ├── tools/                           # Tool registration configs
+├── ui/                              # Next.js 16 web dashboard (React 19, Tailwind v4)
+│   ├── src/app/                     # App router pages (dashboard, incidents, agents, learning)
+│   ├── src/components/              # shadcn/ui components, visualizations, overlays
+│   └── package.json                 # Isolated from ESM backend
 ├── workflows/                       # Elastic Workflow YAML definitions
 ├── .env.example                     # Environment variable template
 ├── .gitignore
@@ -365,17 +698,42 @@ vigil/
 
 ---
 
-## Integrations
+## Kibana Chat Integration
 
-| Integration | Purpose | Protocol |
-|-------------|---------|----------|
-| **Slack** | Incident notifications, interactive approval buttons | Webhook / Slack API |
-| **Jira** | Ticket creation and updates with investigation context | REST API v3 |
-| **PagerDuty** | On-call escalation for critical severity | Events API v2 |
-| **GitHub** | Webhook ingestion for change correlation + deployment rollback | Webhooks + REST API |
-| **Cloudflare** | WAF rule creation for IP blocking (Rulesets API) | REST API |
-| **Okta** | User account suspension and MFA enforcement | OAuth 2.0 |
-| **Kubernetes** | Pod restart, replica scaling, deployment rollback, host isolation | K8s API |
+The **`vigil-chat`** agent provides a conversational interface directly in the Kibana Agent Builder chat UI. Analysts can ask natural-language questions about what the autonomous agents have done, are doing, or plan to do — without leaving Kibana.
+
+```
+You:    "What just happened with the order-service incident?"
+Vigil:  "INC-2026-00847 was a connection pool exhaustion on order-service.
+         Triage scored it 0.88 (critical). Investigator initially identified
+         resource exhaustion, but after remediation failed (health score 0.45),
+         the reflection loop re-investigated and found a connection leak.
+         Second remediation succeeded — health score 0.95. Resolved in 6m 47s."
+```
+
+Six read-only ES|QL tools power the chat: incident lookup, incident list, agent activity trace, live service health, action audit trail, and triage statistics. The chat agent has **read-only access only** — it can never modify incidents, execute workflows, or interfere with active response.
+
+---
+
+## Testing
+
+Vigil implements a **5-layer testing pyramid**:
+
+| Layer | Scope | Tests |
+|-------|-------|-------|
+| Unit | ES|QL query correctness, priority scoring formula, state machine transitions | All boundary values, reflection counting, auto-escalation at limit |
+| Integration | All 29 tools against live Elasticsearch | Parameterized `test.each` with schema validation |
+| Agent Behavior | 55 tests (11 agents × 5 scenarios) via `AgentTestHarness` | Tool selection sequence, A2A contract validation |
+| End-to-End | Full incident lifecycle using demo simulation scripts | Status reaches `resolved`, all agents participated, duration < 300s |
+| Chaos | Failure injection (ES|QL timeouts, LLM 429s, workflow failures) | Circuit breaker activation, graceful degradation |
+
+```bash
+# Run all tests
+NODE_OPTIONS='--experimental-vm-modules' npx jest
+
+# Run UI end-to-end tests (24 tests, 6 spec files)
+npx --prefix ui playwright test
+```
 
 ---
 
@@ -432,7 +790,7 @@ See [`.env.example`](.env.example) for the complete template with all variables.
 | Data store & search | Elasticsearch | 9.3+ / Serverless |
 | Agent framework | Elastic Agent Builder | GA (9.3+) |
 | Query language | ES\|QL | GA with LOOKUP JOIN (tech preview) |
-| LLM backbone | Claude Sonnet 4.5 via Elastic LLM connector | — |
+| LLM backbone | Claude Sonnet 4.6 via Elastic LLM connector | — |
 | Inter-agent protocol | A2A (Google open standard) | — |
 | Automation | Elastic Workflows | GA (9.3+) |
 | Visualization | Kibana dashboards | 9.3+ |
@@ -448,11 +806,12 @@ Built with **Elasticsearch Agent Builder**.
 
 Vigil demonstrates the following Elastic features:
 
-- **Elasticsearch Agent Builder** — 9 agents with custom system prompts, scoped tool access, and ReAct reasoning (+ Reporter and Chat auxiliary agents)
+- **Elasticsearch Agent Builder** — 11 agents with custom system prompts, scoped tool access, and ReAct reasoning
 - **ES|QL** — 21 parameterized query tools including `LOOKUP JOIN` for cross-index change correlation
 - **Elastic Workflows** — 7 YAML-defined automation pipelines with external API integration
-- **A2A Protocol** — Hub-and-spoke inter-agent communication with structured contracts
-- **Dense Vector Search** — 1024-dim embeddings with `int8_hnsw` quantization for hybrid retrieval
-- **Data Streams & ILM** — Time-series data management with automated lifecycle policies
+- **A2A Protocol** — Hub-and-spoke inter-agent communication with 7 typed contracts
+- **Dense Vector Search** — 1024-dim embeddings with `int8_hnsw` quantization for hybrid retrieval across runbooks, threat intel, incidents, and MITRE ATT&CK
+- **Data Streams & ILM** — Time-series data management with automated lifecycle policies (90-day alerts, 1-year audit trail)
 - **Ingest Pipelines** — Automatic embedding generation on document ingest
 - **Kibana Dashboards** — Real-time incident command center with agent activity visualization
+- **Kibana Chat Integration** — Conversational agent (`vigil-chat`) for natural-language queries about incidents, agent activity, and system health directly in the Kibana Agent Builder UI

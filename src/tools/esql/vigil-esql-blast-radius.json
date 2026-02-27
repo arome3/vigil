@@ -5,10 +5,10 @@
   "tags": ["vigil", "investigation"],
   "agent": "vigil-investigator",
   "configuration": {
-    "query": "FROM logs-auth-*, logs-network-* | WHERE @timestamp > NOW() - 48h AND source.ip IN (?compromised_ips) AND destination.ip NOT IN (?compromised_ips) | STATS connection_count = COUNT(*), unique_services = COUNT_DISTINCT(destination.port), data_volume = SUM(network.bytes), first_seen = MIN(@timestamp), last_seen = MAX(@timestamp) BY destination.ip, destination.port | EVAL confidence = CASE(connection_count > 100, 0.95, connection_count > 10, 0.75, connection_count > 1, 0.5, 0.3) | SORT confidence DESC, connection_count DESC | LIMIT 25",
+    "query": "FROM logs-auth-*, logs-network-* | WHERE @timestamp > NOW() - 48h AND source.ip IN (?compromised_ips) AND destination.ip NOT IN (?compromised_ips) | STATS connection_count = COUNT(*), data_volume = SUM(network.bytes), first_seen = MIN(@timestamp), last_seen = MAX(@timestamp) BY destination.ip | EVAL confidence = CASE(connection_count > 100, 0.95, connection_count > 10, 0.75, connection_count > 1, 0.5, 0.3) | SORT confidence DESC, connection_count DESC | LIMIT 25",
     "params": {
       "compromised_ips": {
-        "type": "keyword",
+        "type": "ip",
         "required": true,
         "description": "IP addresses confirmed as compromised"
       }

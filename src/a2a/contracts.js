@@ -47,9 +47,9 @@ export function buildTriageRequest(alert) {
       alert_id: alert.alert_id,
       rule_id: alert.rule_id,
       severity_original: alert.severity_original,
-      source_ip: alert.source_ip,
-      source_user: alert.source_user,
-      affected_asset_id: alert.affected_asset_id
+      source_ip: alert.source_ip || alert.source?.ip,
+      source_user: alert.source_user || alert.source?.user_name || alert.user?.name,
+      affected_asset_id: alert.affected_asset_id || alert.affected_asset?.id
     }
   };
 }

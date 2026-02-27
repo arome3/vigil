@@ -1,7 +1,7 @@
 {
   "name": "vigil-threat-hunter",
   "description": "Proactive sweep — finds additional IoCs across the environment after investigation",
-  "model": "claude-sonnet-4-5-20250929",
+  "model": "claude-sonnet-4-6",
   "system_prompt_file": "system-prompt.md",
   "tools": [
     "vigil-esql-ioc-sweep",

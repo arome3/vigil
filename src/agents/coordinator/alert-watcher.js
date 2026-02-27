@@ -35,7 +35,7 @@ async function markAlertProcessed(alertId, error = null) {
       updateFields.error = error;
     }
     await client.update({
-      index: 'vigil-alerts',
+      index: 'vigil-alert-claims',
       id: alertId,
       doc: updateFields,
       refresh: 'wait_for'
@@ -63,12 +63,15 @@ function buildSentinelReport(alertDoc) {
 
 async function claimAlert(hit) {
   try {
-    await client.update({
-      index: 'vigil-alerts',
+    // Use op_type: 'create' on the claims index — returns 409 if already claimed
+    await client.index({
+      index: 'vigil-alert-claims',
       id: hit._id,
-      if_seq_no: hit._seq_no,
-      if_primary_term: hit._primary_term,
-      doc: { _processing_started_at: new Date().toISOString() },
+      op_type: 'create',
+      document: {
+        alert_id: hit._source?.alert_id || hit._id,
+        claimed_at: new Date().toISOString()
+      },
       refresh: 'wait_for'
     });
     return true;
@@ -132,7 +135,7 @@ export async function processAlert(alertDoc) {
       const sentinelReport = buildSentinelReport(alertDoc);
       await orchestrateOperationalIncident(sentinelReport);
     } else {
-      await orchestrateSecurityIncident(triageResponse);
+      await orchestrateSecurityIncident(triageResponse, source);
     }
   } catch (err) {
     log.error(`Orchestration failed for alert ${alertId}: ${err.message}`, {
@@ -155,19 +158,32 @@ async function pollAlerts() {
   let errorCount = 0;
 
   try {
+    // Fetch IDs of already-claimed alerts to exclude them
+    let claimedIds = [];
+    try {
+      const claimsResult = await client.search({
+        index: 'vigil-alert-claims',
+        size: 1000,
+        _source: false,
+        query: { match_all: {} }
+      });
+      claimedIds = (claimsResult.hits?.hits || []).map(h => h._id);
+    } catch (err) {
+      // Claims index may not exist yet — treat as no claims
+      if (err.meta?.statusCode !== 404) {
+        log.warn(`Failed to fetch claims: ${err.message}`);
+      }
+    }
+
+    const alertQuery = claimedIds.length > 0
+      ? { bool: { must_not: [{ ids: { values: claimedIds } }] } }
+      : { match_all: {} };
+
     const result = await client.search({
-      index: 'vigil-alerts',
+      index: 'vigil-alerts-default',
       size: BATCH_SIZE,
-      seq_no_primary_term: true,
-      query: {
-        bool: {
-          must_not: [
-            { exists: { field: 'processed_at' } },
-            { exists: { field: '_processing_started_at' } }
-          ]
-        }
-      },
-      sort: [{ timestamp: 'asc' }]
+      query: alertQuery,
+      sort: [{ '@timestamp': 'asc' }]
     });
     hits = result.hits?.hits || [];
     currentBackoff = INITIAL_BACKOFF_MS;

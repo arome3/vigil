@@ -19,6 +19,7 @@ const standardIndices = [
   'vigil-baselines',
   'vigil-agent-telemetry',
   'vigil-alerts-operational',
+  'vigil-alert-claims',
   'vigil-reports'
 ];
 

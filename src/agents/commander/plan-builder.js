@@ -93,8 +93,8 @@ function needsApproval(action, severity, tier1Assets) {
   const targetSystem = (action.target_system || '').toLowerCase();
   const targetAsset = (action.target_asset || '').toLowerCase();
 
-  // Rule 1: Network isolation
-  if (type === 'containment' && /\bisolat/.test(desc)) return true;
+  // Rule 1: Network containment (isolation or firewall blocking)
+  if (type === 'containment' && (/\bisolat/.test(desc) || targetSystem === 'firewall')) return true;
 
   // Rule 2: Production deployment rollback
   if (type === 'remediation' && /\brollback\b/.test(desc) && targetSystem === 'kubernetes') return true;
@@ -464,7 +464,14 @@ function deriveLatencyTarget(serviceName, metrics) {
     return defaultTarget;
   }
 
-  // Use a fraction of degraded latency, clamped to a sane range
+  // If current latency is already at or below the default target the service
+  // is healthy (or recovering).  Use the default — don't set an impossibly
+  // tight threshold that would cause the verifier to fail a healthy service.
+  if (metrics.avg_latency <= defaultTarget) {
+    return defaultTarget;
+  }
+
+  // Service is degraded — use a fraction of degraded latency as recovery target
   const derived = Math.round(metrics.avg_latency * RECOVERY_FACTOR);
   return Math.max(MIN_LATENCY, Math.min(MAX_LATENCY, derived));
 }
